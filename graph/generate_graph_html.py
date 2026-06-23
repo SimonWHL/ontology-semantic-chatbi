@@ -193,6 +193,12 @@ def generate(input_path: Path, output_path: Path) -> None:
     with input_path.open(encoding="utf-8") as f:
         data = json.load(f)
 
+    # 过滤掉 sql_edge 为 true 的边（SQL 逻辑边，暂时注释掉不显示）
+    all_edges = data.get("edges", [])
+    filtered_edges = [e for e in all_edges if not e.get("sql_edge")]
+    skipped_count = len(all_edges) - len(filtered_edges)
+    data["edges"] = filtered_edges
+
     title = data.get("domain", "语义") + " 语义图谱"
     if data.get("domain") == "opportunity":
         title = "商机语义图谱"
@@ -208,7 +214,7 @@ def generate(input_path: Path, output_path: Path) -> None:
     )
     output_path.write_text(html, encoding="utf-8")
     print(f"已生成: {output_path}")
-    print(f"节点数: {len(data.get('nodes', []))}  边数: {len(data.get('edges', []))}")
+    print(f"节点数: {len(data.get('nodes', []))}  边数: {len(data.get('edges', []))}  已跳过SQL边: {skipped_count}")
 
 
 def main() -> None:
