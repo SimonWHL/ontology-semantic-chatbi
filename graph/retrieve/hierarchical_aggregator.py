@@ -1365,13 +1365,15 @@ def build_hierarchical_subgraph(
     deduped_collected_nodes: Set[str] = set()
     deduped_collected_edges: Dict[Tuple[str, str], Edge] = {}
 
+    # 合并所有边用于查找（g0 语义边 + sql 边）
+    _all_edge_pool = list(g0_graph.edges) + (list(sql_edges) if sql_edges else [])
     for p in deduped_paths:
         for nl in p.get("nodes", []):
             deduped_collected_nodes.add(nl)
         for ei in p.get("edges", []):
             key = (ei["from"], ei["to"])
             if key not in deduped_collected_edges:
-                for e in g0_graph.edges:
+                for e in _all_edge_pool:
                     if (e.from_label == ei["from"]
                             and e.to_label == ei["to"]
                             and e.label == ei["label"]):

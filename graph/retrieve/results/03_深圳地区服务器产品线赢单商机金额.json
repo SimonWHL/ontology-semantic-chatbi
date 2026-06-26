@@ -18,14 +18,23 @@
         "column": "performance_city"
       },
       {
-        "label": "首次下单",
+        "label": "商机创建",
         "type": "Event",
         "color": "#f8fb60",
-        "description": "商机的第一次下单日期",
+        "description": "商机创建日期",
         "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_order_date",
-        "column": "first_order_date",
+        "dimension": "dim_create_time",
+        "column": "create_time",
         "data_type": "datetime"
+      },
+      {
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
       },
       {
         "label": "商机金额",
@@ -39,15 +48,6 @@
         "unit": "万元"
       },
       {
-        "label": "出库明细",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dataset": "ads_gn_sales_deliver_detail",
-        "foreign_entity": "opportunity_id"
-      },
-      {
         "label": "赢单商机",
         "type": "Concept/Filter",
         "color": "#7afb60",
@@ -59,6 +59,15 @@
         "warning": "语义层 filter_won_project 当前为 not in，与赢单语义相反，建议改为 in"
       },
       {
+        "label": "出库明细",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
+      },
+      {
         "label": "产品类别",
         "type": "Attribute",
         "color": "#60a5fa",
@@ -66,53 +75,10 @@
         "cube": "cube_gn_sales_deliver_detail",
         "dimension": "dim_product_category",
         "column": "product_category"
-      },
-      {
-        "label": "商机",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
-      },
-      {
-        "label": "商机创建",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "商机创建日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_create_time",
-        "column": "create_time",
-        "data_type": "datetime"
       }
     ],
     "edges": [
       {
-        "from": "赢单商机",
-        "to": "首次下单",
-        "label": "constrains",
-        "display_label": "状态为赢单"
-      },
-      {
-        "from": "商机",
-        "to": "首次下单",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "商机",
-        "to": "商机创建",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "商机创建",
-        "to": "商机金额",
-        "label": "measured_by",
-        "display_label": "被度量"
-      },
-      {
         "from": "出库明细",
         "to": "产品类别",
         "label": "has_attribute",
@@ -127,46 +93,9 @@
       },
       {
         "from": "商机",
-        "to": "城市",
-        "label": "has_attribute",
-        "display_label": "位于"
-      },
-      {
-        "from": "商机",
-        "to": "城市",
-        "label": "has_attribute",
-        "display_label": "位于"
-      },
-      {
-        "from": "商机",
-        "to": "出库明细",
-        "label": "relates_to",
-        "display_label": "通过opportunity_id关联",
-        "join_key": "opportunity_id"
-      },
-      {
-        "from": "出库明细",
-        "to": "产品类别",
-        "label": "has_attribute",
-        "display_label": "包含属性"
-      },
-      {
-        "from": "商机",
         "to": "商机创建",
         "label": "has_event",
         "display_label": "经历事件"
-      },
-      {
-        "from": "商机",
-        "to": "首次下单",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "赢单商机",
-        "to": "首次下单",
-        "label": "constrains",
-        "display_label": "状态为赢单"
       },
       {
         "from": "商机创建",
@@ -175,14 +104,10 @@
         "display_label": "被度量"
       },
       {
-        "from": "赢单商机",
-        "to": "商机金额",
-        "label": "where",
-        "display_label": "业务口径过滤",
-        "sql_edge": true,
-        "sql_clause": "WHERE",
-        "condition_type": "concept_filter",
-        "expr": "opportunity_status in ('赢单（合同签订）', '赢单（执行订单）')"
+        "from": "商机",
+        "to": "城市",
+        "label": "has_attribute",
+        "display_label": "位于"
       }
     ]
   },
@@ -202,46 +127,6 @@
           "to": "商机金额",
           "label": "where",
           "display_label": "业务口径过滤"
-        }
-      ],
-      "level": 0
-    },
-    {
-      "between": [
-        "赢单商机",
-        "商机金额"
-      ],
-      "nodes": [
-        "赢单商机",
-        "首次下单",
-        "商机",
-        "商机创建",
-        "商机金额"
-      ],
-      "edges": [
-        {
-          "from": "赢单商机",
-          "to": "首次下单",
-          "label": "constrains",
-          "display_label": "状态为赢单"
-        },
-        {
-          "from": "商机",
-          "to": "首次下单",
-          "label": "has_event",
-          "display_label": "经历事件"
-        },
-        {
-          "from": "商机",
-          "to": "商机创建",
-          "label": "has_event",
-          "display_label": "经历事件"
-        },
-        {
-          "from": "商机创建",
-          "to": "商机金额",
-          "label": "measured_by",
-          "display_label": "被度量"
         }
       ],
       "level": 0
@@ -413,14 +298,14 @@
     ],
     "path_dedup_stats": {
       "original_count": 26,
-      "deduped_count": 4,
-      "reduction_ratio": "84%"
+      "deduped_count": 3,
+      "reduction_ratio": "88%"
     }
   },
   "meta": {
-    "total_nodes": 8,
-    "total_edges": 15,
-    "total_paths": 4,
+    "total_nodes": 7,
+    "total_edges": 5,
+    "total_paths": 3,
     "isolated_count": 0,
     "max_hops": 5
   }
