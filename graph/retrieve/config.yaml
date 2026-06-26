@@ -1,0 +1,33 @@
+# 知识图谱检索 - 配置文件
+# 请在此填入你的 API Key
+
+# ═══════════════════════════════════════════════════════
+# 实体抽取策略
+# ═══════════════════════════════════════════════════════
+extraction:
+  use_embedding: true           # 是否启用 Embedding 语义匹配
+  use_llm: true                 # 是否启用 LLM 精筛（需要 DeepSeek API）
+  embedding_threshold: 0.35     # Embedding 宽召回相似度阈值
+  embedding_max_results: 15     # Embedding 最大候选数
+
+# ═══════════════════════════════════════════════════════
+# 子图召回策略
+# ═══════════════════════════════════════════════════════
+# "v1" = subgraph_builder (BFS最短路径), "v2" = subgraph_retriever_v2 (分层聚合)
+retriever: "v2"
+max_hops: 5                     # BFS 最大跳数
+
+# v2 分层知识图谱聚合参数（仅 retriever=v2 时生效）
+v2:
+  use_diffusion: true           # true=分层聚合, false=传统BFS最短路径
+  max_levels: 2                 # 最大层级数（含G0，即构建到G1）
+  min_cluster_size: 2           # 每簇最少实体数
+  cross_cluster_threshold: 0.1  # 跨簇关联强度阈值
+  use_llm: true                 # 是否用LLM生成抽象概念名
+  force_rebuild_hg: false       # 强制重建分层图谱（忽略缓存）
+
+# DeepSeek API Key（用于 LLM 评判 和 LLM 增强实体抽取）
+deepseek:
+  api_key: "sk-c6362dc8a2d24efe873e203facceedb5"
+  base_url: "https://api.deepseek.com/chat/completions"
+  model: "deepseek-v4-flash"
