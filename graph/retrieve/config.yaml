@@ -28,6 +28,6 @@ v2:
 
 # DeepSeek API Key（用于 LLM 评判 和 LLM 增强实体抽取）
 deepseek:
-  api_key: "sk-c6362dc8a2d24efe873e203facceedb5"
+  api_key: <your api key>
   base_url: "https://api.deepseek.com/chat/completions"
   model: "deepseek-v4-flash"
