@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import hashlib
 import os
+import pickle
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -457,21 +458,39 @@ def build_hierarchical_graph(
     Returns:
         HierarchicalGraph 多层图谱
     """
-    # 尝试从缓存加载
+    # 尝试从缓存加载(pickle 格式, 含指纹验证)
     if cache_dir:
-        cache_path = cache_dir / "hierarchical_graph.json"
-        if cache_path.exists():
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = cache_dir / "hierarchical_graph.pkl"
+        fingerprint_path = cache_dir / "graph_fingerprint.txt"
+
+        # 计算当前图的指纹: node数:edge数:domain:labels_hash
+        fp_parts = [
+            str(len(graph.nodes)),
+            str(len(graph.edges)),
+            graph.domain or "",
+            hashlib.md5(",".join(sorted(n.label for n in graph.nodes)).encode()).hexdigest(),
+        ]
+        current_fp = ":".join(fp_parts)
+
+        if cache_path.exists() and fingerprint_path.exists():
             try:
-                hg = _load_hierarchical_from_cache(cache_path, graph)
-                # 同时加载 embedding 缓存
-                emb_path = cache_dir / "g0_embeddings.json"
-                emb_result = _load_embeddings_cache(emb_path)
-                if emb_result:
-                    hg.g0_embeddings, hg.g0_clusters = emb_result
-                    print(f"  [Cache] embedding + clusters 已加载 ({len(hg.g0_embeddings)} 节点, {len(hg.g0_clusters)} 簇)")
-                return hg
-            except Exception:
-                pass
+                cached_fp = fingerprint_path.read_text(encoding="utf-8").strip()
+                if cached_fp == current_fp:
+                    import time
+                    t0 = time.time()
+                    with open(cache_path, "rb") as f:
+                        hg = pickle.load(f)
+                    elapsed = time.time() - t0
+                    print(f"  ⚡ [Cache] 从磁盘加载分层图谱, 耗时 {elapsed:.1f}s"
+                          f" (节点 {fp_parts[0]}, 边 {fp_parts[1]})")
+                    return hg
+                else:
+                    print(f"  [Cache] 图指纹已变化, 重新构建分层图谱")
+            except Exception as e:
+                print(f"  [Cache] 缓存加载失败 ({e}), 重新构建分层图谱")
+        else:
+            print(f"  [Build] 缓存不存在, 首次构建分层图谱（约需 60~95 秒）...")
 
     hg = HierarchicalGraph()
     
@@ -696,13 +715,22 @@ def build_hierarchical_graph(
     hg.g0_embeddings = g0_embeddings
     hg.g0_clusters = g0_clusters
 
-    # 缓存(含 embedding 和 clusters)
+    # 缓存: pickle 序列化整个 hg(含 g0 embeddings 和 clusters)
     if cache_dir:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        _save_hierarchical_to_cache(hg, cache_dir / "hierarchical_graph.json")
-        # 额外持久化 G0 的 embedding 和簇分配
-        if g0_embeddings is not None:
-            _save_embeddings_cache(g0_embeddings, g0_clusters, cache_dir / "g0_embeddings.json")
+        import time
+        t0 = time.time()
+        with open(cache_dir / "hierarchical_graph.pkl", "wb") as f:
+            pickle.dump(hg, f)
+        # 写入图指纹
+        fp_parts = [
+            str(len(graph.nodes)),
+            str(len(graph.edges)),
+            graph.domain or "",
+            hashlib.md5(",".join(sorted(n.label for n in graph.nodes)).encode()).hexdigest(),
+        ]
+        (cache_dir / "graph_fingerprint.txt").write_text(":".join(fp_parts), encoding="utf-8")
+        elapsed = time.time() - t0
+        print(f"  💾 [Cache] 分层图谱已保存, 耗时 {elapsed:.1f}s")
 
     return hg
 
