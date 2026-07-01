@@ -169,11 +169,17 @@ def main():
 
     # 加载图谱
     print(f"加载图谱: {args.graph}", file=sys.stderr)
-    graph, index, capability, sql_edges = _load(args.graph)
+    graph_path = Path(args.graph)
+    if not graph_path.is_absolute():
+        graph_path = BASE_DIR / graph_path
+    graph, index, capability, sql_edges = _load(str(graph_path))
     extractor = build_extractor(
         node_labels=set(index.graph.node_map.keys()),
         node_map=index.graph.node_map,
+        cache_path=BASE_DIR / "embeddings.pkl",
+        graph_path=graph_path,
     )
+    extractor.initialize()
     print(f"节点: {len(graph.nodes)}  语义边: {len(graph.edges)}", file=sys.stderr)
 
     # 从 config 读取参数

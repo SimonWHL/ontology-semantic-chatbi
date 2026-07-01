@@ -17,6 +17,7 @@
 
 import json
 import os
+import pickle
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -168,7 +169,6 @@ class EntityExtractor:
         # ── 缓存路径 ──
         self._cache_path = cache_path
         self._graph_path = graph_path
-        self._cache_tried = False
 
         # 构建派生指标映射（泛化：从图谱边的"衍生依赖"关系自动提取）
         # derived_metric -> {base_metric1, base_metric2, ...}，用于去重
@@ -186,28 +186,111 @@ class EntityExtractor:
             except Exception:
                 pass
 
-    # ── 缓存加载 ────────────────────────────────────────
+    # ── 启动时一次性初始化 ────────────────────────────
 
-    def _try_load_from_cache(self):
-        """尝试从持久化缓存加载节点和别名向量。"""
-        if self._cache_tried:
-            return
-        self._cache_tried = True
+    def initialize(self) -> None:
+        """启动时一次性初始化 Embedding：检查缓存指纹 → 命中则加载，否则编码并落盘。
 
-        if not self._cache_path or not self._graph_path:
-            return
-
+        只应在程序启动时调用一次。之后所有 _ensure_* 方法均为空操作。
+        """
         model_name = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-base-zh-v1.5")
-        from embedding_store import load_cache
-        cache = load_cache(self._cache_path, self._graph_path, model_name)
-        if cache is None:
+
+        # 尝试从 pickle 加载
+        if self._cache_path and self._graph_path:
+            from embedding_store import load_cache
+            cache = load_cache(self._cache_path, self._graph_path, model_name)
+            if cache is not None:
+                self._node_embeddings = cache["node_embeddings"]
+                self._alias_embeddings = cache["alias_embeddings"]
+                self._alias_id_to_label = cache["alias_id_to_label"]
+                print(f"[INIT] ✓ Embedding 缓存命中: {len(self._node_embeddings)} 节点, "
+                      f"{len(self._alias_embeddings)} 别名向量")
+                return
+
+        # 缓存未命中 → 编码全部节点+别名 → 落盘
+        self._ensure_embedding_model()
+        if self._embedding_model is None:
+            print("[WARN] Embedding 模型加载失败，语义匹配不可用")
+            self._node_embeddings = {}
+            self._alias_embeddings = {}
+            self._alias_id_to_label = {}
             return
 
-        self._node_embeddings = cache["node_embeddings"]
-        self._alias_embeddings = cache["alias_embeddings"]
-        self._alias_id_to_label = cache["alias_id_to_label"]
-        print(f"[CACHE] ✓ 命中: {len(self._node_embeddings)} 节点向量, "
+        print(f"[INIT] 缓存未命中，开始实时编码...")
+
+        # ── 编码所有节点 ──
+        texts = []
+        labels = []
+        for label, node in self.node_map.items():
+            parts = [node.label]
+            if node.description:
+                parts.append(node.description)
+            if node.synonyms:
+                parts.extend(node.synonyms)
+            if node.type == "Attribute":
+                parts.append(f"按{node.label}维度筛选")
+                parts.append(f"{node.label}名称")
+            texts.append(" | ".join(parts))
+            labels.append(label)
+
+        embeddings = self._embedding_model.encode(texts, normalize_embeddings=True)
+        self._node_embeddings = {label: emb.tolist() for label, emb in zip(labels, embeddings)}
+
+        # ── 编码所有别名 ──
+        alias_to_label_emb: Dict[str, str] = dict(self._alias_to_label)
+        for label, node in self.node_map.items():
+            if node.type in ("Function", "MetricCategory"):
+                alias_to_label_emb[label] = label
+                for syn in node.synonyms:
+                    if syn not in alias_to_label_emb:
+                        alias_to_label_emb[syn] = label
+        for alias, target in ALIAS_MAP.items():
+            if target in self.node_map and self.node_map[target].type in ("Function", "MetricCategory"):
+                if alias not in alias_to_label_emb:
+                    alias_to_label_emb[alias] = target
+
+        alias_texts = []
+        alias_keys = []
+        for alias, label in alias_to_label_emb.items():
+            node = self.node_map.get(label)
+            parts = [alias]
+            if node:
+                parts.append(node.label)
+                if node.description:
+                    parts.append(node.description)
+                if node.type:
+                    parts.append(f"类型:{node.type}")
+            alias_texts.append(" | ".join(parts))
+            alias_keys.append((alias, label))
+
+        alias_vecs = self._embedding_model.encode(alias_texts, normalize_embeddings=True)
+        self._alias_embeddings = {
+            key: vec.tolist() for key, vec in zip(alias_keys, alias_vecs)
+        }
+        self._alias_id_to_label = {key: label for key, label in alias_keys}
+
+        print(f"[INIT] ✓ 实时编码完成: {len(self._node_embeddings)} 节点, "
               f"{len(self._alias_embeddings)} 别名向量")
+
+        # ── 写 pickle 缓存 ──
+        if self._cache_path and self._graph_path:
+            try:
+                from embedding_store import _compute_graph_fingerprint
+                cache_data = {
+                    "model_name": model_name,
+                    "graph_fingerprint": _compute_graph_fingerprint(self._graph_path),
+                    "graph_path": str(self._graph_path.resolve()),
+                    "node_embeddings": self._node_embeddings,
+                    "alias_embeddings": self._alias_embeddings,
+                    "alias_id_to_label": self._alias_id_to_label,
+                }
+                self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(self._cache_path, "wb") as f:
+                    pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                size_mb = self._cache_path.stat().st_size / 1024 / 1024
+                print(f"[INIT] 💾 缓存已保存: {self._cache_path} ({size_mb:.1f} MB)")
+            except Exception as e:
+                print(f"[WARN] 保存缓存失败: {e}")
 
     # ── L1: 规则匹配（仅固定概念） ─────────────────────
 
@@ -326,15 +409,11 @@ class EntityExtractor:
             self._embedding_model = None
 
     def _ensure_node_embeddings(self):
-        """预计算所有节点的向量。"""
+        """预计算所有节点的向量（启动时 initialize() 已提前完成）。"""
         if self._node_embeddings is not None:
             return
 
-        # 尝试从缓存加载
-        self._try_load_from_cache()
-        if self._node_embeddings is not None:
-            return  # 已从缓存加载，跳过实时编码
-
+        # initialize() 未被调用的回退路径：实时编码（仅内存，不落盘）
         self._ensure_embedding_model()
         if self._embedding_model is None:
             self._node_embeddings = {}
@@ -343,13 +422,11 @@ class EntityExtractor:
         texts = []
         labels = []
         for label, node in self.node_map.items():
-            # 拼接节点描述文本（Attribute 节点重点描述其语义角色）
             parts = [node.label]
             if node.description:
                 parts.append(node.description)
             if node.synonyms:
                 parts.extend(node.synonyms)
-            # Attribute 节点：附加上下文帮助 Embedding 理解其维度含义
             if node.type == "Attribute":
                 parts.append(f"按{node.label}维度筛选")
                 parts.append(f"{node.label}名称")
@@ -421,31 +498,19 @@ class EntityExtractor:
     # ── L2.5: Embedding 关键词提取 ────────────────────────
 
     def _ensure_alias_embeddings(self):
-        """预计算所有别名+节点描述的向量，用于关键词级语义匹配。
-
-        覆盖范围包括：
-        - _safe_labels 节点的所有别名（规则匹配的固定概念）
-        - Function / MetricCategory 节点的别名（不参与规则匹配但需要被 Embedding 召回）
-        - 手工 ALIAS_MAP 中的别名
-        """
+        """预计算所有别名+节点描述的向量（启动时 initialize() 已提前完成）。"""
         if hasattr(self, '_alias_embeddings') and self._alias_embeddings is not None:
             return
 
-        # 尝试从缓存加载
-        self._try_load_from_cache()
-        if hasattr(self, '_alias_embeddings') and self._alias_embeddings is not None:
-            return  # 已从缓存加载
-
+        # initialize() 未被调用的回退路径：实时编码（仅内存，不落盘）
         self._ensure_embedding_model()
         if self._embedding_model is None:
             self._alias_embeddings = {}
             self._alias_id_to_label = {}
             return
 
-        # 收集所有需要 Embedding 索引的别名
         alias_to_label_emb: Dict[str, str] = dict(self._alias_to_label)
 
-        # 补充 Function / MetricCategory 节点的别名
         for label, node in self.node_map.items():
             if node.type in ("Function", "MetricCategory"):
                 alias_to_label_emb[label] = label
@@ -453,16 +518,14 @@ class EntityExtractor:
                     if syn not in alias_to_label_emb:
                         alias_to_label_emb[syn] = label
 
-        # 补充 ALIAS_MAP 中 Function/MetricCategory 相关的别名
         for alias, target in ALIAS_MAP.items():
             if target in self.node_map and self.node_map[target].type in ("Function", "MetricCategory"):
                 if alias not in alias_to_label_emb:
                     alias_to_label_emb[alias] = target
 
         texts = []
-        alias_ids = []  # 用 (alias, label) 作为 id
+        alias_ids = []
         for alias, label in alias_to_label_emb.items():
-            # 别名文本：别名本身 + 目标节点的描述信息
             node = self.node_map.get(label)
             parts = [alias]
             if node:

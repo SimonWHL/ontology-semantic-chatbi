@@ -304,7 +304,10 @@ def main():
     extractor = build_extractor(
         node_labels=set(index.graph.node_map.keys()),
         node_map=index.graph.node_map,
+        cache_path=BASE_DIR / "embeddings.pkl",
+        graph_path=graph_path,
     )
+    extractor.initialize()
     print(f"   节点: {len(graph.nodes)}  语义边: {len(graph.edges)}", file=sys.stderr)
     print(f"   召回策略: {retriever_name}  LLM: {use_llm}  Embedding: {use_embedding}  评判: {args.judge}", file=sys.stderr)
 

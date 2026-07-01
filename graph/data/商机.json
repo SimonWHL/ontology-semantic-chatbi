@@ -479,18 +479,6 @@
     },
     {
       "from": "出库明细",
-      "to": "行业",
-      "label": "has_attribute",
-      "display_label": "最终用户行业"
-    },
-    {
-      "from": "出库明细",
-      "to": "子行业",
-      "label": "has_attribute",
-      "display_label": "最终用户子行业"
-    },
-    {
-      "from": "出库明细",
       "to": "出库金额",
       "label": "measured_by",
       "display_label": "被度量"
@@ -2265,6 +2253,12 @@
       "based_on_metric": "metric_outbound_amount_sum",
       "from": "规上商机",
       "to": "出库金额"
+    },
+    {
+      "from": "出库明细",
+      "to": "客户",
+      "label": "relates_to",
+      "display_label": "出库客户"
     }
   ]
 }

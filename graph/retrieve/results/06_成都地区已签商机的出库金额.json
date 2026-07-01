@@ -4,37 +4,18 @@
     "已签商机",
     "出库金额",
     "城市",
-    "商机",
     "出库明细"
   ],
   "subgraph": {
     "nodes": [
       {
-        "label": "已签商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
-        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
-        "expr": "first_signature_date is not null"
-      },
-      {
-        "label": "商机",
+        "label": "出库明细",
         "type": "Entity",
         "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
-      },
-      {
-        "label": "首次出库",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "第一次出库日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_outbound_date",
-        "column": "first_outbound_date",
-        "data_type": "datetime"
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
       },
       {
         "label": "首次下单",
@@ -47,13 +28,15 @@
         "data_type": "datetime"
       },
       {
-        "label": "出库明细",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "label": "出库金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "交货总金额，来自出库明细域",
         "cube": "cube_gn_sales_deliver_detail",
-        "dataset": "ads_gn_sales_deliver_detail",
-        "foreign_entity": "opportunity_id"
+        "metric": "metric_delivery_amount_total",
+        "metric_type": "simple",
+        "agg": "SUM",
+        "expr": "ZJHZJ_JT"
       },
       {
         "label": "首次签章",
@@ -66,6 +49,25 @@
         "data_type": "datetime"
       },
       {
+        "label": "首次出库",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "第一次出库日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_outbound_date",
+        "column": "first_outbound_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
+      },
+      {
         "label": "城市",
         "type": "Attribute",
         "color": "#60a5fa",
@@ -75,15 +77,12 @@
         "column": "performance_city"
       },
       {
-        "label": "出库金额",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "交货总金额，来自出库明细域",
-        "cube": "cube_gn_sales_deliver_detail",
-        "metric": "metric_delivery_amount_total",
-        "metric_type": "simple",
-        "agg": "SUM",
-        "expr": "ZJHZJ_JT"
+        "label": "已签商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
+        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
+        "expr": "first_signature_date is not null"
       }
     ],
     "edges": [
@@ -395,7 +394,6 @@
         "已签商机",
         "出库金额",
         "城市",
-        "商机",
         "出库明细"
       ],
       "1": [
@@ -405,27 +403,10 @@
         "Entity簇3"
       ]
     },
-    "lca_groups": [
-      {
-        "lca": "Entity簇3",
-        "entities": [
-          "商机",
-          "出库明细"
-        ],
-        "scope": "pair"
-      }
-    ],
+    "lca_groups": [],
     "searched_pairs": [
       [
-        "商机",
-        "出库明细"
-      ],
-      [
         "出库明细",
-        "出库金额"
-      ],
-      [
-        "商机",
         "出库金额"
       ],
       [
@@ -513,9 +494,9 @@
       }
     ],
     "path_dedup_stats": {
-      "original_count": 8,
+      "original_count": 5,
       "deduped_count": 4,
-      "reduction_ratio": "50%"
+      "reduction_ratio": "20%"
     }
   },
   "meta": {

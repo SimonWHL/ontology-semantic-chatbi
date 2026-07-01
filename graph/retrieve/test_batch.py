@@ -113,9 +113,9 @@ def main():
         graph_path=graph_path,
     )
 
-    # 预加载 embedding 模型到内存（避免第一题计时包含模型加载开销）
-    print("   ⏳ 加载 embedding 模型...")
-    extractor._ensure_embedding_model()
+    # 启动时一次性初始化 Embedding（缓存命中→直接加载，否则编码+落盘）
+    print("   ⏳ 初始化 Embedding...")
+    extractor.initialize()
     print("   ✓ 就绪")
 
     cfg = _load_config()
