@@ -97,6 +97,9 @@ def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
 
     SQL 边只用于最终展示和上下文补充，不参与路径搜索，避免连接爆炸。
     筛选规则：边必须是 SQL 边，且 from 和 to 节点都在子图中。
+
+    同时生成 sql_analysis_paths：对于通过 SQL 边连接但无语义路径的
+    维度-指标对，生成分析路径描述供下游使用。
     """
     sub_labels = {n.label if hasattr(n, "label") else n.get("label") for n in subgraph.get("nodes", [])}
     relevant_sql_edges = [
@@ -105,11 +108,38 @@ def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
     ]
     if not relevant_sql_edges:
         return dict(subgraph)
-    return {
+
+    paths = subgraph.get("paths", [])
+    connected_pairs = set()
+    for p in paths:
+        between = p.get("between", [])
+        if len(between) == 2:
+            connected_pairs.add(tuple(sorted(between)))
+
+    sql_analysis_paths = []
+    seen_pairs = set()
+    for e in relevant_sql_edges:
+        pair_key = tuple(sorted([e.from_label, e.to_label]))
+        if pair_key in connected_pairs or pair_key in seen_pairs:
+            continue
+        seen_pairs.add(pair_key)
+        sql_analysis_paths.append({
+            "between": [e.from_label, e.to_label],
+            "sql_clause": e.sql_clause or "WHERE",
+            "condition_type": e.condition_type or "",
+            "join_key": e.join_key or "",
+            "display_label": e.display_label or "",
+        })
+
+    result = {
         **subgraph,
         "edges": subgraph.get("edges", []) + relevant_sql_edges,
         "sql_edge_count": len(relevant_sql_edges),
     }
+    if sql_analysis_paths:
+        result["sql_analysis_paths"] = sql_analysis_paths
+
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════

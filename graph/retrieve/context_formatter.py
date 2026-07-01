@@ -39,6 +39,11 @@ def format_context(
         "isolated": subgraph.get("isolated", []),
     }
 
+    # SQL 分析路径（维度-指标通过 SQL 边连接但无语义路径的关系）
+    sql_analysis_paths = subgraph.get("sql_analysis_paths")
+    if sql_analysis_paths:
+        result["sql_analysis_paths"] = sql_analysis_paths
+
     # 维度-指标分析能力矩阵（独立模块，不参与路径检索）
     if capability_notes:
         result["capability"] = capability_notes

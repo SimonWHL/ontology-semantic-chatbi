@@ -1462,6 +1462,50 @@ def build_hierarchical_subgraph(
         nodes_in_paths.update(n for n in pth.get("nodes", []) if n in node_map)
     isolated = [e for e in valid_entities if e not in nodes_in_paths]
 
+    # 对孤立节点扩大跳数重试，确保子图连通
+    if isolated and max_hops < 10:
+        retry_hops = max_hops + 3
+        for iso in list(isolated):
+            targets = metric_nodes if metric_nodes else [n for n in nodes_in_paths if n != iso]
+            found = False
+            for target in targets:
+                if target == iso:
+                    continue
+                paths = _bfs_v1(
+                    semantic_index, iso, target,
+                    max_hops=retry_hops,
+                    max_paths=1,
+                    include_sql_edges=False,
+                )
+                if paths:
+                    for pth in paths:
+                        new_path = {
+                            "between": [iso, target],
+                            "nodes": pth["nodes"],
+                            "edges": pth["edges"],
+                            "level": 0,
+                            "guided_by_lca": None,
+                        }
+                        deduped_paths.append(new_path)
+                        for nl in pth["nodes"]:
+                            if nl in node_map:
+                                collected_nodes.add(nl)
+                        for ei in pth["edges"]:
+                            key = (ei["from"], ei["to"], ei.get("label", ""))
+                            if key not in collected_edges:
+                                for edge in g0_graph.edges:
+                                    if edge.sql_edge:
+                                        continue
+                                    if (edge.from_label == ei["from"]
+                                            and edge.to_label == ei["to"]
+                                            and edge.label == ei.get("label")):
+                                        collected_edges[key] = edge
+                                        break
+                    found = True
+                    break
+            if found:
+                isolated.remove(iso)
+
     return {
         "nodes": [node_map[n] for n in collected_nodes if n in node_map],
         "edges": list(collected_edges.values()),
