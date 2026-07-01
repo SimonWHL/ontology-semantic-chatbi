@@ -1047,6 +1047,33 @@ def _find_paths_in_layer(
 # 噪音中间节点类型：这些类型的节点在路径中间时，通常不提供有价值的语义信息
 _NOISY_INTERMEDIATE_TYPES = {"Function", "Event", "MetricCategory", "Concept/Filter"}
 
+_LOW_PRIORITY_BRIDGE_LABELS = {"金额指标", "数量指标"}
+
+
+def _is_metric_node(label: str, node_map: Dict[str, Any]) -> bool:
+    node = node_map.get(label) if node_map else None
+    return bool(node and getattr(node, "type", None) == "Metric")
+
+
+def _is_low_priority_metric_shortcut(
+    prev_node: str,
+    bridge_node: str,
+    next_node: str,
+    node_map: Dict[str, Any],
+) -> bool:
+    return (
+        bridge_node in _LOW_PRIORITY_BRIDGE_LABELS
+        and _is_metric_node(prev_node, node_map)
+        and _is_metric_node(next_node, node_map)
+    )
+
+
+def _path_has_low_priority_metric_shortcut(nodes: List[str], node_map: Dict[str, Any]) -> bool:
+    return any(
+        _is_low_priority_metric_shortcut(nodes[i - 1], nodes[i], nodes[i + 1], node_map)
+        for i in range(1, len(nodes) - 1)
+    )
+
 _MEASUREMENT_EDGE_TYPES = {"measured_by", "measured_as"}
 
 
@@ -1094,6 +1121,14 @@ def deduplicate_paths(
         return []
 
     entity_set = set(entities or [])
+
+    if node_map:
+        paths = [
+            p for p in paths
+            if not _path_has_low_priority_metric_shortcut(p.get('nodes', []), node_map)
+        ]
+        if not paths:
+            return []
 
     # ── 策略1: 精确结构去重 ──
     seen_signatures: Set[str] = set()
@@ -1302,7 +1337,6 @@ def build_hierarchical_subgraph(
     *,
     max_hops: int = 5,
     expand_to_g0: bool = True,
-    sql_edges: list = None,
 ) -> dict:
     """LCA-guided v2 子图检索。
 

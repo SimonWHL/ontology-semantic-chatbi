@@ -84,6 +84,26 @@ def _load(graph_path: str) -> tuple[SemanticGraph, GraphIndex, object, list]:
     return graph, index, capability, sql_edges
 
 
+def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
+    """子图生成完成后，合并相关的 SQL 逻辑边（仅 edge.sql_edge=True）。
+
+    SQL 边只用于最终展示和上下文补充，不参与路径搜索。
+    筛选规则：边必须是 SQL 边，且 from 和 to 节点都在子图中。
+    """
+    sub_labels = {n.label for n in subgraph.get("nodes", [])}
+    relevant_sql_edges = [
+        e for e in all_edges_with_sql
+        if e.sql_edge and e.from_label in sub_labels and e.to_label in sub_labels
+    ]
+    if not relevant_sql_edges:
+        return dict(subgraph)
+    return {
+        **subgraph,
+        "edges": subgraph.get("edges", []) + relevant_sql_edges,
+        "sql_edge_count": len(relevant_sql_edges),
+    }
+
+
 def query(
     question: str,
     index: GraphIndex,
@@ -139,10 +159,11 @@ def query(
         subgraph_fn, extra_kwargs = build_subgraph, {}
         retriever_name = "v1"
 
-    if retriever_name == "v2" and sql_edges:
-        subgraph = subgraph_fn(entities, index, max_hops=max_hops, sql_edges=sql_edges, **extra_kwargs)
-    else:
-        subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+    subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+
+    # Phase 2.5: SQL 边后处理合并（SQL 边不参与路径搜索，仅在子图完成后补充）
+    if sql_edges:
+        subgraph = _merge_sql_edges(subgraph, sql_edges)
 
     # Phase 3: 格式化（含指标能力矩阵）
     cap_notes = ""

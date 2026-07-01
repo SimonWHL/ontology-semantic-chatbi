@@ -9,13 +9,23 @@
   "subgraph": {
     "nodes": [
       {
-        "label": "出库明细",
-        "type": "Entity",
+        "label": "首次出库",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "第一次出库日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_outbound_date",
+        "column": "first_outbound_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "城市",
+        "type": "Attribute",
         "color": "#60a5fa",
-        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dataset": "ads_gn_sales_deliver_detail",
-        "foreign_entity": "opportunity_id"
+        "description": "业绩地市",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_performance_city",
+        "column": "performance_city"
       },
       {
         "label": "首次下单",
@@ -28,17 +38,6 @@
         "data_type": "datetime"
       },
       {
-        "label": "出库金额",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "交货总金额，来自出库明细域",
-        "cube": "cube_gn_sales_deliver_detail",
-        "metric": "metric_delivery_amount_total",
-        "metric_type": "simple",
-        "agg": "SUM",
-        "expr": "ZJHZJ_JT"
-      },
-      {
         "label": "首次签章",
         "type": "Event",
         "color": "#f8fb60",
@@ -49,14 +48,21 @@
         "data_type": "datetime"
       },
       {
-        "label": "首次出库",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "第一次出库日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_outbound_date",
-        "column": "first_outbound_date",
-        "data_type": "datetime"
+        "label": "已签商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
+        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
+        "expr": "first_signature_date is not null"
+      },
+      {
+        "label": "出库明细",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
       },
       {
         "label": "商机",
@@ -68,21 +74,15 @@
         "primary_entity": "opportunity_id"
       },
       {
-        "label": "城市",
-        "type": "Attribute",
-        "color": "#60a5fa",
-        "description": "业绩地市",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_performance_city",
-        "column": "performance_city"
-      },
-      {
-        "label": "已签商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
-        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
-        "expr": "first_signature_date is not null"
+        "label": "出库金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "交货总金额，来自出库明细域",
+        "cube": "cube_gn_sales_deliver_detail",
+        "metric": "metric_delivery_amount_total",
+        "metric_type": "simple",
+        "agg": "SUM",
+        "expr": "ZJHZJ_JT"
       }
     ],
     "edges": [
@@ -140,67 +140,6 @@
         "to": "首次出库",
         "label": "state_transition",
         "display_label": "事件流转"
-      },
-      {
-        "from": "商机",
-        "to": "城市",
-        "label": "has_attribute",
-        "display_label": "位于"
-      },
-      {
-        "from": "商机",
-        "to": "出库明细",
-        "label": "relates_to",
-        "display_label": "通过opportunity_id关联",
-        "join_key": "opportunity_id"
-      },
-      {
-        "from": "出库明细",
-        "to": "出库金额",
-        "label": "measured_by",
-        "display_label": "被度量"
-      },
-      {
-        "from": "商机",
-        "to": "首次签章",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "商机",
-        "to": "首次下单",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "商机",
-        "to": "首次出库",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "首次签章",
-        "to": "首次下单",
-        "label": "state_transition",
-        "display_label": "事件流转"
-      },
-      {
-        "from": "首次下单",
-        "to": "首次出库",
-        "label": "state_transition",
-        "display_label": "事件流转"
-      },
-      {
-        "from": "已签商机",
-        "to": "首次签章",
-        "label": "constrains",
-        "display_label": "first_signature_date非空"
-      },
-      {
-        "from": "首次出库",
-        "to": "出库金额",
-        "label": "measured_by",
-        "display_label": "被度量"
       },
       {
         "from": "城市",
@@ -501,7 +440,7 @@
   },
   "meta": {
     "total_nodes": 8,
-    "total_edges": 22,
+    "total_edges": 12,
     "total_paths": 4,
     "isolated_count": 0,
     "max_hops": 5

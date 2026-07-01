@@ -37,6 +37,31 @@ _LOW_PRIORITY_BRIDGE_LABELS = {"金额指标", "数量指标"}
 _LOW_PRIORITY_BRIDGE_PENALTY = 8
 
 
+def _is_metric_node(label: str, node_map: Dict[str, Node]) -> bool:
+    node = node_map.get(label)
+    return bool(node and node.type == "Metric")
+
+
+def _is_low_priority_metric_shortcut(
+    prev_node: str,
+    bridge_node: str,
+    next_node: str,
+    node_map: Dict[str, Node],
+) -> bool:
+    return (
+        bridge_node in _LOW_PRIORITY_BRIDGE_LABELS
+        and _is_metric_node(prev_node, node_map)
+        and _is_metric_node(next_node, node_map)
+    )
+
+
+def _path_has_low_priority_metric_shortcut(nodes: List[str], node_map: Dict[str, Node]) -> bool:
+    return any(
+        _is_low_priority_metric_shortcut(nodes[i - 1], nodes[i], nodes[i + 1], node_map)
+        for i in range(1, len(nodes) - 1)
+    )
+
+
 def _classify_entities(
     entities: List[str],
     node_map: Dict[str, Node],
@@ -316,6 +341,13 @@ def _bfs_shortest_paths(
         for next_node, edge in next_steps:
             if next_node in node_path:
                 continue
+            if (
+                len(node_path) >= 2
+                and _is_low_priority_metric_shortcut(
+                    node_path[-2], current, next_node, graph.node_map
+                )
+            ):
+                continue
             new_path = tuple(node_path + [next_node])
             if new_path in visited_paths:
                 continue
@@ -379,6 +411,10 @@ def _filter_relevant_paths(
        存在更短替代路径的，过滤掉。
     """
     entity_set = set(valid_entities)
+    paths = [
+        p for p in paths
+        if not _path_has_low_priority_metric_shortcut(p.get("nodes", []), node_map)
+    ]
 
     # group by (between tuple)
     from collections import defaultdict

@@ -28,6 +28,12 @@ from hierarchical_aggregator import (
     build_hierarchical_graph,
     build_hierarchical_subgraph,
 )
+from subgraph_builder import (
+    _LOW_PRIORITY_BRIDGE_LABELS,
+    _LOW_PRIORITY_BRIDGE_PENALTY,
+    _is_low_priority_metric_shortcut,
+    _path_has_low_priority_metric_shortcut,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -93,7 +99,7 @@ def build_subgraph(
     cross_cluster_threshold: float = 0.1,
     use_llm: bool = True,
     force_rebuild_hg: bool = False,
-    sql_edges: list = None,  # SQL 边列表，用于注入直接捷径
+    sql_edges: list = None,  # 已废弃，SQL 边不参与路径搜索，仅保留参数兼容性
 ) -> dict:
     """构建子图（v2 分层聚合策略）。
 
@@ -165,7 +171,6 @@ def build_subgraph(
         valid_entities, graph, hg,
         max_hops=max_hops,
         expand_to_g0=True,
-        sql_edges=sql_edges,
     )
 
     # 展开邻居（可选）
@@ -240,7 +245,7 @@ def _classify_entities(
     return metrics, constraints, others
 
 
-def _score_path(path: dict, entity_set: set = None) -> Tuple[int, int]:
+def _score_path(path: dict, entity_set: set = None, node_map: Dict[str, Node] = None) -> Tuple[int, int]:
     """评分路径：(跳数, 噪音数)。
     
     泛化规则：中间节点如果在 entity_set 中，不算噪音（因为用户明确要了它）。
@@ -261,10 +266,21 @@ def _score_path(path: dict, entity_set: set = None) -> Tuple[int, int]:
     return (hops, noise)
 
 
-def _filter_relevant_paths(paths: List[dict], entity_set: set = None) -> List[dict]:
+def _filter_relevant_paths(
+    paths: List[dict],
+    entity_set: set = None,
+    node_map: Dict[str, Node] = None,
+) -> List[dict]:
     if not paths:
         return []
     entity_set = entity_set or set()
+    if node_map:
+        paths = [
+            p for p in paths
+            if not _path_has_low_priority_metric_shortcut(p.get("nodes", []), node_map)
+        ]
+        if not paths:
+            return []
     groups: Dict[Tuple[str, str], List[dict]] = {}
     for p in paths:
         between = p.get("between", [])
@@ -342,12 +358,23 @@ def _bfs_shortest_paths(
         for next_node, edge in next_steps:
             if next_node in node_path:
                 continue
+            if (
+                len(node_path) >= 2
+                and _is_low_priority_metric_shortcut(
+                    node_path[-2], current, next_node, graph.node_map
+                )
+            ):
+                continue
             new_path = tuple(node_path + [next_node])
             if new_path in visited_paths:
                 continue
             visited_paths.add(new_path)
             next_node_obj = graph.node_map.get(next_node)
-            penalty = 4 if (next_node_obj and next_node_obj.type == "MetricCategory") else 0
+            penalty = 0
+            if next_node_obj and next_node_obj.type == "MetricCategory":
+                penalty += 4
+            if next_node in _LOW_PRIORITY_BRIDGE_LABELS and next_node not in {start, end}:
+                penalty += _LOW_PRIORITY_BRIDGE_PENALTY
             new_weight = weight + 1 + penalty
             heapq.heappush(pq, (new_weight, seq, next_node,
                                 list(node_path) + [next_node],
@@ -429,7 +456,7 @@ def _build_subgraph_bfs(
                 for p in paths:
                     _collect_path({"between": [a, b], "nodes": p["nodes"], "edges": p["edges"]})
 
-    all_paths = _filter_relevant_paths(all_paths, set(valid_entities))
+    all_paths = _filter_relevant_paths(all_paths, set(valid_entities), node_map)
 
     if expand_neighbors > 0:
         extra_nodes: Set[str] = set()

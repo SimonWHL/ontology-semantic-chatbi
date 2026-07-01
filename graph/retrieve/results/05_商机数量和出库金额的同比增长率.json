@@ -11,20 +11,14 @@
   "subgraph": {
     "nodes": [
       {
-        "label": "出库明细",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dataset": "ads_gn_sales_deliver_detail",
-        "foreign_entity": "opportunity_id"
-      },
-      {
-        "label": "环比",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "period-over-period",
-        "category": "时间派生"
+        "label": "首次出库",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "第一次出库日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_outbound_date",
+        "column": "first_outbound_date",
+        "data_type": "datetime"
       },
       {
         "label": "同比",
@@ -34,31 +28,11 @@
         "category": "时间派生"
       },
       {
-        "label": "出库金额",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "交货总金额，来自出库明细域",
-        "cube": "cube_gn_sales_deliver_detail",
-        "metric": "metric_delivery_amount_total",
-        "metric_type": "simple",
-        "agg": "SUM",
-        "expr": "ZJHZJ_JT"
-      },
-      {
-        "label": "金额指标",
-        "type": "MetricCategory",
-        "color": "#60a5fa",
-        "description": "金额类指标的逻辑分组（商机金额、总商机金额、去重商机金额、出库金额）"
-      },
-      {
-        "label": "首次出库",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "第一次出库日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_outbound_date",
-        "column": "first_outbound_date",
-        "data_type": "datetime"
+        "label": "环比",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "period-over-period",
+        "category": "时间派生"
       },
       {
         "label": "商机数",
@@ -72,19 +46,26 @@
         "expr": "ZZOPPID"
       },
       {
-        "label": "商机",
+        "label": "出库明细",
         "type": "Entity",
         "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
       },
       {
         "label": "求和",
         "type": "Function",
         "color": "#ca60fb",
         "description": "SUM",
+        "category": "基础聚合"
+      },
+      {
+        "label": "计数",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "COUNT / COUNT_DISTINCT",
         "category": "基础聚合"
       },
       {
@@ -95,11 +76,36 @@
         "category": "时间派生"
       },
       {
-        "label": "计数",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "COUNT / COUNT_DISTINCT",
-        "category": "基础聚合"
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
+      },
+      {
+        "label": "金额指标",
+        "type": "MetricCategory",
+        "color": "#60a5fa",
+        "description": "金额类指标的逻辑分组（商机金额、总商机金额、去重商机金额、出库金额）"
+      },
+      {
+        "label": "数量指标",
+        "type": "MetricCategory",
+        "color": "#60a5fa",
+        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
+      },
+      {
+        "label": "出库金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "交货总金额，来自出库明细域",
+        "cube": "cube_gn_sales_deliver_detail",
+        "metric": "metric_delivery_amount_total",
+        "metric_type": "simple",
+        "agg": "SUM",
+        "expr": "ZJHZJ_JT"
       },
       {
         "label": "去重商机数",
@@ -111,12 +117,6 @@
           "metric_duplicate_opportunity_count"
         ],
         "warning": "语义层缺少对应 metric 定义"
-      },
-      {
-        "label": "数量指标",
-        "type": "MetricCategory",
-        "color": "#60a5fa",
-        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
       }
     ],
     "edges": [
@@ -228,121 +228,6 @@
         "to": "出库金额",
         "label": "measured_by",
         "display_label": "被度量"
-      },
-      {
-        "from": "商机",
-        "to": "出库明细",
-        "label": "relates_to",
-        "display_label": "通过opportunity_id关联",
-        "join_key": "opportunity_id"
-      },
-      {
-        "from": "出库明细",
-        "to": "出库金额",
-        "label": "measured_by",
-        "display_label": "被度量"
-      },
-      {
-        "from": "商机",
-        "to": "首次出库",
-        "label": "has_event",
-        "display_label": "经历事件"
-      },
-      {
-        "from": "首次出库",
-        "to": "出库金额",
-        "label": "measured_by",
-        "display_label": "被度量"
-      },
-      {
-        "from": "商机",
-        "to": "商机数",
-        "label": "measured_by",
-        "display_label": "COUNT_DISTINCT"
-      },
-      {
-        "from": "去重商机数",
-        "to": "商机数",
-        "label": "derived_from",
-        "display_label": "衍生依赖"
-      },
-      {
-        "from": "出库金额",
-        "to": "金额指标",
-        "label": "classified_as",
-        "display_label": "属于",
-        "custom": true
-      },
-      {
-        "from": "商机数",
-        "to": "数量指标",
-        "label": "classified_as",
-        "display_label": "属于",
-        "custom": true
-      },
-      {
-        "from": "去重商机数",
-        "to": "数量指标",
-        "label": "classified_as",
-        "display_label": "属于",
-        "custom": true
-      },
-      {
-        "from": "金额指标",
-        "to": "求和",
-        "label": "supports_function",
-        "display_label": "可计算",
-        "custom": true
-      },
-      {
-        "from": "数量指标",
-        "to": "求和",
-        "label": "supports_function",
-        "display_label": "可计算",
-        "custom": true
-      },
-      {
-        "from": "数量指标",
-        "to": "计数",
-        "label": "supports_function",
-        "display_label": "可计算",
-        "custom": true
-      },
-      {
-        "from": "求和",
-        "to": "同比",
-        "label": "derived_from",
-        "display_label": "时间派生"
-      },
-      {
-        "from": "求和",
-        "to": "环比",
-        "label": "derived_from",
-        "display_label": "时间派生"
-      },
-      {
-        "from": "计数",
-        "to": "同比",
-        "label": "derived_from",
-        "display_label": "时间派生"
-      },
-      {
-        "from": "计数",
-        "to": "环比",
-        "label": "derived_from",
-        "display_label": "时间派生"
-      },
-      {
-        "from": "同比",
-        "to": "增长率",
-        "label": "derived_from",
-        "display_label": "派生"
-      },
-      {
-        "from": "环比",
-        "to": "增长率",
-        "label": "derived_from",
-        "display_label": "派生"
       },
       {
         "from": "首次出库",
@@ -993,7 +878,7 @@
   },
   "meta": {
     "total_nodes": 13,
-    "total_edges": 37,
+    "total_edges": 19,
     "total_paths": 11,
     "isolated_count": 0,
     "max_hops": 5

@@ -72,18 +72,18 @@ def _safe_filename(text: str, max_len: int = 40) -> str:
     return safe.strip("_")
 
 
-def _merge_sql_edges(subgraph: dict, all_sql_edges: list) -> dict:
-    """将相关 SQL 边合并到子图中（不修改原 subgraph）。
+def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
+    """子图生成完成后，合并相关的 SQL 逻辑边（仅 edge.sql_edge=True）。
 
-    筛选规则：SQL 边的 from 和 to 节点都在子图中，则加入。
-    返回新的 subgraph dict（含合并后的 nodes + edges）。
+    SQL 边只用于最终展示和上下文补充，不参与路径搜索。
+    筛选规则：边必须是 SQL 边，且 from 和 to 节点都在子图中。
     """
     sub_labels = {n.label for n in subgraph.get("nodes", [])}
 
-    relevant_sql_edges = []
-    for e in all_sql_edges:
-        if e.from_label in sub_labels and e.to_label in sub_labels:
-            relevant_sql_edges.append(e)
+    relevant_sql_edges = [
+        e for e in all_edges_with_sql
+        if e.sql_edge and e.from_label in sub_labels and e.to_label in sub_labels
+    ]
 
     if not relevant_sql_edges:
         return dict(subgraph)
@@ -171,13 +171,9 @@ def main():
         print(f"   → 维度节点: {attr_hits}")
         print(f"   → 固定概念: {safe_hits}")
 
-        # Phase 2: 子图构建
-        # v2 用 sql_edges 注入捷径，v1 不需要
-        if retriever_name == "v2":
-            subgraph = subgraph_fn(entities, index, max_hops=max_hops, sql_edges=graph_with_sql.edges, **extra_kwargs)
-        else:
-            subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
-        # 合并 SQL 边
+        # Phase 2: 子图构建（SQL 边不参与路径搜索）
+        subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+        # 后处理：合并 SQL 边（仅 sql_edge=True 的边）
         subgraph_with_sql = _merge_sql_edges(subgraph, graph_with_sql.edges)
         paths = subgraph_with_sql.get("paths", subgraph.get("paths", []))
         isolated = subgraph_with_sql.get("isolated", subgraph.get("isolated", []))

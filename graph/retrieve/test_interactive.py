@@ -92,15 +92,16 @@ def _get_subgraph_builder():
     return build_subgraph_v1, {}, retriever
 
 
-def _merge_sql_edges(subgraph: dict, all_sql_edges: list) -> dict:
-    """子图生成完成后再合并相关 SQL 边。
+def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
+    """子图生成完成后，合并相关的 SQL 逻辑边（仅 edge.sql_edge=True）。
 
-    SQL 边只用于最终展示和上下文补充，不参与 v2 路径搜索，避免连接爆炸。
+    SQL 边只用于最终展示和上下文补充，不参与路径搜索，避免连接爆炸。
+    筛选规则：边必须是 SQL 边，且 from 和 to 节点都在子图中。
     """
     sub_labels = {n.label if hasattr(n, "label") else n.get("label") for n in subgraph.get("nodes", [])}
     relevant_sql_edges = [
-        e for e in all_sql_edges
-        if e.from_label in sub_labels and e.to_label in sub_labels
+        e for e in all_edges_with_sql
+        if e.sql_edge and e.from_label in sub_labels and e.to_label in sub_labels
     ]
     if not relevant_sql_edges:
         return dict(subgraph)
@@ -353,11 +354,9 @@ def main():
         )
         print(f"\n📌 识别实体: {entities}")
 
-        # ── Phase 2: 子图构建
-        if retriever_name == "v2":
-            subgraph = subgraph_fn(entities, index, max_hops=max_hops, sql_edges=graph_with_sql.edges, **extra_kwargs)
-        else:
-            subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+        # ── Phase 2: 子图构建（SQL 边不参与路径搜索）
+        subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+        # 后处理：合并 SQL 边（仅 sql_edge=True）
         subgraph = _merge_sql_edges(subgraph, graph_with_sql.edges)
 
         # ── 输出路径 1: 紧凑路径文本 ──
