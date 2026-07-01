@@ -1,0 +1,16 @@
+---
+description: Store caches and downloads on D drive
+alwaysApply: true
+---
+
+# Storage location rule
+
+- All caches, model files, package downloads, temporary large files, generated artifacts, and tool downloads must be stored on the D drive, preferably under `D:\cursor` or another user-approved D-drive path.
+- Do not intentionally write caches, downloads, model files, or large temporary files to the C drive.
+- Do not modify, delete, or clean C-drive files unless the user explicitly asks for that specific action.
+- Before running tools or commands that may download models/packages or create large cache files, set or verify cache environment variables so they point to D-drive paths.
+- For HuggingFace / Transformers / SentenceTransformers, use:
+  - `HF_HOME=D:\cursor\hf_cache`
+  - `HF_HUB_CACHE=D:\cursor\hf_cache\hub`
+  - `TRANSFORMERS_CACHE=D:\cursor\hf_cache\transformers`
+  - `SENTENCE_TRANSFORMERS_HOME=D:\cursor\hf_cache\sentence_transformers`

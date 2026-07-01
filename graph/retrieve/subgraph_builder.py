@@ -31,6 +31,11 @@ _TARGET_TYPES = _METRIC_TYPES | _FUNCTION_TYPES
 # 约束类节点类型：它们是查询"按什么筛选/分组/限制"的条件
 _CONSTRAINT_TYPES = {"Entity", "Attribute", "Filter", "Concept/Filter", "Event"}
 
+# 高频指标分类枢纽：这些节点连接了大量指标，容易在路径搜索中形成语义捷径。
+# 不禁用，但当它们作为中间节点出现时显著降权。
+_LOW_PRIORITY_BRIDGE_LABELS = {"金额指标", "数量指标"}
+_LOW_PRIORITY_BRIDGE_PENALTY = 8
+
 
 def _classify_entities(
     entities: List[str],
@@ -316,11 +321,14 @@ def _bfs_shortest_paths(
                 continue
             visited_paths.add(new_path)
 
-            # 计算惩罚：MetricCategory 是跨域桥接，权重+4 确保不产生语义捷径
+            # 计算惩罚：MetricCategory 是跨域桥接，权重+4 确保不产生语义捷径。
+            # 金额指标/数量指标是高频分类枢纽，作为中间节点时更容易制造捷径，额外降权。
             next_node_obj = graph.node_map.get(next_node)
             penalty = 0
             if next_node_obj and next_node_obj.type == "MetricCategory":
-                penalty = 4
+                penalty += 4
+            if next_node in _LOW_PRIORITY_BRIDGE_LABELS and next_node not in {start, end}:
+                penalty += _LOW_PRIORITY_BRIDGE_PENALTY
 
             new_weight = weight + 1 + penalty
             heapq.heappush(pq, (new_weight, seq, next_node, list(node_path) + [next_node], edge_path + [edge]))
@@ -381,11 +389,15 @@ def _filter_relevant_paths(
 
     def _score(p: dict) -> tuple:
         """评分：越低越好。
-        (路径长度, 中间无关Function数, 中间无关节点总数)
+        (路径长度, 高频分类枢纽数, 中间无关Function数, 中间无关节点总数)
         """
         nodes = p.get("nodes", [])
         edges = p.get("edges", [])
         middle = nodes[1:-1]
+        low_priority_bridges = sum(
+            1 for mn in middle
+            if mn not in entity_set and mn in _LOW_PRIORITY_BRIDGE_LABELS
+        )
         noisy_fn = 0
         for i, mn in enumerate(middle):
             if mn in entity_set:
@@ -399,7 +411,7 @@ def _filter_relevant_paths(
                 continue
             noisy_fn += 1
         noisy_all = sum(1 for mn in middle if mn not in entity_set)
-        return (len(nodes), noisy_fn, noisy_all)
+        return (len(nodes), low_priority_bridges, noisy_fn, noisy_all)
 
     filtered = []
     for key, group in groups.items():
@@ -407,16 +419,16 @@ def _filter_relevant_paths(
         best_score = _score(group[0])
 
         # 检查是否存在完全不经过噪音节点（MetricCategory/Function/Event）的干净路径
-        has_clean_path = any(_score(p)[1] == 0 for p in group)
+        has_clean_path = any(_score(p)[2] == 0 for p in group)
 
         for p in group:
             s = _score(p)
             # 规则1: 如果存在更干净的同端点路径（长度≤当前 且 无关节点更少），跳过当前
-            if s[0] > best_score[0] and s[1] > best_score[1]:
+            if s[0] > best_score[0] and (s[1], s[2]) > (best_score[1], best_score[2]):
                 continue
             # 规则2: 如果存在完全不经过 MetricCategory/Function/Event 的干净路径，
             #         则过滤掉经过了这些噪音节点的路径（等长也过滤）
-            if has_clean_path and s[1] > 0:
+            if has_clean_path and s[2] > 0:
                 continue
             filtered.append(p)
 

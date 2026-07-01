@@ -20,6 +20,59 @@
         "expr": "ZZOPPID"
       },
       {
+        "label": "求和",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "SUM",
+        "category": "基础聚合"
+      },
+      {
+        "label": "数量指标",
+        "type": "MetricCategory",
+        "color": "#60a5fa",
+        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
+      },
+      {
+        "label": "计数",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "COUNT / COUNT_DISTINCT",
+        "category": "基础聚合"
+      },
+      {
+        "label": "首次出库",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "第一次出库日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_outbound_date",
+        "column": "first_outbound_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "环比",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "period-over-period",
+        "category": "时间派生"
+      },
+      {
+        "label": "出库明细",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
+      },
+      {
+        "label": "增长率",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "由同比/环比派生的增长率",
+        "category": "时间派生"
+      },
+      {
         "label": "商机",
         "type": "Entity",
         "color": "#60a5fa",
@@ -29,11 +82,10 @@
         "primary_entity": "opportunity_id"
       },
       {
-        "label": "同比",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "year-over-year",
-        "category": "时间派生"
+        "label": "金额指标",
+        "type": "MetricCategory",
+        "color": "#60a5fa",
+        "description": "金额类指标的逻辑分组（商机金额、总商机金额、去重商机金额、出库金额）"
       },
       {
         "label": "出库金额",
@@ -47,62 +99,70 @@
         "expr": "ZJHZJ_JT"
       },
       {
-        "label": "首次出库",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "第一次出库日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_outbound_date",
-        "column": "first_outbound_date",
-        "data_type": "datetime"
-      },
-      {
-        "label": "数量指标",
-        "type": "MetricCategory",
-        "color": "#60a5fa",
-        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
-      },
-      {
-        "label": "增长率",
+        "label": "同比",
         "type": "Function",
         "color": "#ca60fb",
-        "description": "由同比/环比派生的增长率",
-        "category": "时间派生"
-      },
-      {
-        "label": "金额指标",
-        "type": "MetricCategory",
-        "color": "#60a5fa",
-        "description": "金额类指标的逻辑分组（商机金额、总商机金额、去重商机金额、出库金额）"
-      },
-      {
-        "label": "求和",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "SUM",
-        "category": "基础聚合"
-      },
-      {
-        "label": "计数",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "COUNT / COUNT_DISTINCT",
-        "category": "基础聚合"
-      },
-      {
-        "label": "环比",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "period-over-period",
+        "description": "year-over-year",
         "category": "时间派生"
       }
     ],
     "edges": [
       {
+        "from": "出库金额",
+        "to": "金额指标",
+        "label": "classified_as",
+        "display_label": "属于",
+        "custom": true
+      },
+      {
+        "from": "金额指标",
+        "to": "求和",
+        "label": "supports_function",
+        "display_label": "可计算",
+        "custom": true
+      },
+      {
+        "from": "求和",
+        "to": "同比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "同比",
+        "to": "增长率",
+        "label": "derived_from",
+        "display_label": "派生"
+      },
+      {
+        "from": "求和",
+        "to": "环比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "环比",
+        "to": "增长率",
+        "label": "derived_from",
+        "display_label": "派生"
+      },
+      {
         "from": "商机",
         "to": "商机数",
         "label": "measured_by",
         "display_label": "COUNT_DISTINCT"
+      },
+      {
+        "from": "商机",
+        "to": "出库明细",
+        "label": "relates_to",
+        "display_label": "通过opportunity_id关联",
+        "join_key": "opportunity_id"
+      },
+      {
+        "from": "出库明细",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
       },
       {
         "from": "商机",
@@ -144,32 +204,46 @@
         "custom": true
       },
       {
-        "from": "求和",
-        "to": "同比",
-        "label": "derived_from",
-        "display_label": "时间派生"
+        "from": "商机",
+        "to": "出库明细",
+        "label": "relates_to",
+        "display_label": "通过opportunity_id关联",
+        "join_key": "opportunity_id"
       },
       {
-        "from": "同比",
-        "to": "增长率",
-        "label": "derived_from",
-        "display_label": "派生"
+        "from": "出库明细",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
       },
       {
-        "from": "求和",
-        "to": "环比",
-        "label": "derived_from",
-        "display_label": "时间派生"
+        "from": "商机",
+        "to": "首次出库",
+        "label": "has_event",
+        "display_label": "经历事件"
       },
       {
-        "from": "环比",
-        "to": "增长率",
-        "label": "derived_from",
-        "display_label": "派生"
+        "from": "首次出库",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
+      },
+      {
+        "from": "商机",
+        "to": "商机数",
+        "label": "measured_by",
+        "display_label": "COUNT_DISTINCT"
       },
       {
         "from": "出库金额",
         "to": "金额指标",
+        "label": "classified_as",
+        "display_label": "属于",
+        "custom": true
+      },
+      {
+        "from": "商机数",
+        "to": "数量指标",
         "label": "classified_as",
         "display_label": "属于",
         "custom": true
@@ -180,10 +254,194 @@
         "label": "supports_function",
         "display_label": "可计算",
         "custom": true
+      },
+      {
+        "from": "数量指标",
+        "to": "求和",
+        "label": "supports_function",
+        "display_label": "可计算",
+        "custom": true
+      },
+      {
+        "from": "数量指标",
+        "to": "计数",
+        "label": "supports_function",
+        "display_label": "可计算",
+        "custom": true
+      },
+      {
+        "from": "求和",
+        "to": "同比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "求和",
+        "to": "环比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "计数",
+        "to": "同比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "计数",
+        "to": "环比",
+        "label": "derived_from",
+        "display_label": "时间派生"
+      },
+      {
+        "from": "同比",
+        "to": "增长率",
+        "label": "derived_from",
+        "display_label": "派生"
+      },
+      {
+        "from": "环比",
+        "to": "增长率",
+        "label": "derived_from",
+        "display_label": "派生"
+      },
+      {
+        "from": "首次出库",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "时间过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "time_filter"
+      },
+      {
+        "from": "首次出库",
+        "to": "商机数",
+        "label": "group_by",
+        "display_label": "时间分组",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "time_group"
       }
     ]
   },
   "paths": [
+    {
+      "between": [
+        "出库金额",
+        "增长率"
+      ],
+      "nodes": [
+        "出库金额",
+        "金额指标",
+        "求和",
+        "同比",
+        "增长率"
+      ],
+      "edges": [
+        {
+          "from": "出库金额",
+          "to": "金额指标",
+          "label": "classified_as",
+          "display_label": "属于"
+        },
+        {
+          "from": "金额指标",
+          "to": "求和",
+          "label": "supports_function",
+          "display_label": "可计算"
+        },
+        {
+          "from": "求和",
+          "to": "同比",
+          "label": "derived_from",
+          "display_label": "时间派生"
+        },
+        {
+          "from": "同比",
+          "to": "增长率",
+          "label": "derived_from",
+          "display_label": "派生"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "出库金额",
+        "增长率"
+      ],
+      "nodes": [
+        "出库金额",
+        "金额指标",
+        "求和",
+        "环比",
+        "增长率"
+      ],
+      "edges": [
+        {
+          "from": "出库金额",
+          "to": "金额指标",
+          "label": "classified_as",
+          "display_label": "属于"
+        },
+        {
+          "from": "金额指标",
+          "to": "求和",
+          "label": "supports_function",
+          "display_label": "可计算"
+        },
+        {
+          "from": "求和",
+          "to": "环比",
+          "label": "derived_from",
+          "display_label": "时间派生"
+        },
+        {
+          "from": "环比",
+          "to": "增长率",
+          "label": "derived_from",
+          "display_label": "派生"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "商机数",
+        "出库金额"
+      ],
+      "nodes": [
+        "商机数",
+        "商机",
+        "出库明细",
+        "出库金额"
+      ],
+      "edges": [
+        {
+          "from": "商机",
+          "to": "商机数",
+          "label": "measured_by",
+          "display_label": "COUNT_DISTINCT"
+        },
+        {
+          "from": "商机",
+          "to": "出库明细",
+          "label": "relates_to",
+          "display_label": "通过opportunity_id关联"
+        },
+        {
+          "from": "出库明细",
+          "to": "出库金额",
+          "label": "measured_by",
+          "display_label": "被度量"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
     {
       "between": [
         "商机数",
@@ -215,7 +473,8 @@
           "display_label": "被度量"
         }
       ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
     },
     {
       "between": [
@@ -248,7 +507,8 @@
           "display_label": "时间派生"
         }
       ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
     },
     {
       "between": [
@@ -288,7 +548,8 @@
           "display_label": "派生"
         }
       ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
     },
     {
       "between": [
@@ -328,91 +589,13 @@
           "display_label": "派生"
         }
       ],
-      "level": 0
-    },
-    {
-      "between": [
-        "出库金额",
-        "增长率"
-      ],
-      "nodes": [
-        "出库金额",
-        "金额指标",
-        "求和",
-        "同比",
-        "增长率"
-      ],
-      "edges": [
-        {
-          "from": "出库金额",
-          "to": "金额指标",
-          "label": "classified_as",
-          "display_label": "属于"
-        },
-        {
-          "from": "金额指标",
-          "to": "求和",
-          "label": "supports_function",
-          "display_label": "可计算"
-        },
-        {
-          "from": "求和",
-          "to": "同比",
-          "label": "derived_from",
-          "display_label": "时间派生"
-        },
-        {
-          "from": "同比",
-          "to": "增长率",
-          "label": "derived_from",
-          "display_label": "派生"
-        }
-      ],
-      "level": 0
-    },
-    {
-      "between": [
-        "出库金额",
-        "增长率"
-      ],
-      "nodes": [
-        "出库金额",
-        "金额指标",
-        "求和",
-        "环比",
-        "增长率"
-      ],
-      "edges": [
-        {
-          "from": "出库金额",
-          "to": "金额指标",
-          "label": "classified_as",
-          "display_label": "属于"
-        },
-        {
-          "from": "金额指标",
-          "to": "求和",
-          "label": "supports_function",
-          "display_label": "可计算"
-        },
-        {
-          "from": "求和",
-          "to": "环比",
-          "label": "derived_from",
-          "display_label": "时间派生"
-        },
-        {
-          "from": "环比",
-          "to": "增长率",
-          "label": "derived_from",
-          "display_label": "派生"
-        }
-      ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
     }
   ],
   "isolated": [],
   "hierarchy": {
+    "strategy": "lca_guided_v2_no_sql_path",
     "num_levels": 2,
     "matched_levels": {
       "0": [
@@ -422,95 +605,132 @@
         "增长率"
       ],
       "1": [
-        "数据统计函数",
-        "商机度量",
-        "出库金额"
+        "Metric簇9",
+        "Metric簇10",
+        "Function簇8"
       ]
     },
+    "lca_groups": [
+      {
+        "lca": "Function簇8",
+        "entities": [
+          "同比",
+          "增长率"
+        ],
+        "scope": "pair"
+      }
+    ],
+    "searched_pairs": [
+      [
+        "同比",
+        "增长率"
+      ],
+      [
+        "出库金额",
+        "同比"
+      ],
+      [
+        "出库金额",
+        "增长率"
+      ],
+      [
+        "商机数",
+        "出库金额"
+      ],
+      [
+        "商机数",
+        "同比"
+      ],
+      [
+        "商机数",
+        "增长率"
+      ]
+    ],
+    "sql_policy": "SQL edges are excluded during path construction and should be merged after subgraph retrieval.",
     "abstract_nodes": [
       {
-        "label": "业务维度",
-        "description": "一组用于业务分析的分类属性，涵盖地域、行业、产品等核心维度。",
+        "label": "Attribute簇0",
+        "description": "4个Attribute节点的语义聚合",
         "level": 1,
         "member_count": 4
       },
       {
-        "label": "商机阶段",
-        "description": "商机从新建到赢单或未中标等不同状态的分类与过滤条件",
+        "label": "Concept/Filter簇1",
+        "description": "6个Concept/Filter节点的语义聚合",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "大额商机",
-        "description": "出库额达到10万元以上的规模以上商机，代表高价值业务机会",
+        "label": "Concept/Filter簇2",
+        "description": "1个Concept/Filter节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "销售业务实体",
-        "description": "涵盖销售过程中从商机、客户到出库明细的核心业务实体",
+        "label": "Entity簇3",
+        "description": "3个Entity节点的语义聚合",
         "level": 1,
         "member_count": 3
       },
       {
-        "label": "商机关键日期",
-        "description": "商机生命周期中从创建到出库的重要时间节点",
+        "label": "Event簇4",
+        "description": "5个Event节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "投标结果",
-        "description": "表示投标活动的结果状态，包括中标和未中标两种情况。",
+        "label": "Event簇5",
+        "description": "2个Event节点的语义聚合",
         "level": 1,
         "member_count": 2
       },
       {
-        "label": "聚合函数",
-        "description": "一组用于对数据进行汇总、计数、极值及差值计算的操作函数。",
+        "label": "Function簇6",
+        "description": "5个Function节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "聚合函数_7",
-        "description": "对一组数值进行统计汇总的数学函数，如计算平均值等。",
+        "label": "Function簇7",
+        "description": "1个Function节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "数据统计函数",
-        "description": "一组用于分析数据变化、比例、排序关系的常用计算函数或业务指标",
+        "label": "Function簇8",
+        "description": "5个Function节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "商机度量",
-        "description": "涵盖商机金额、数量及其去重处理的度量指标集合",
+        "label": "Metric簇9",
+        "description": "6个Metric节点的语义聚合",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "出库金额",
-        "description": "指出库过程中产生的交货总金额等度量数据，来源于出库明细域。",
+        "label": "Metric簇10",
+        "description": "1个Metric节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "指标分类",
-        "description": "对业务指标按类型进行逻辑分组的类别，如金额类和数量类。",
+        "label": "MetricCategory簇11",
+        "description": "2个MetricCategory节点的语义聚合",
         "level": 1,
         "member_count": 2
       }
     ],
     "path_dedup_stats": {
-      "original_count": 52,
-      "deduped_count": 6,
-      "reduction_ratio": "88%"
+      "original_count": 10,
+      "deduped_count": 7,
+      "reduction_ratio": "30%"
     }
   },
   "meta": {
-    "total_nodes": 11,
-    "total_edges": 13,
-    "total_paths": 6,
+    "total_nodes": 12,
+    "total_edges": 33,
+    "total_paths": 7,
     "isolated_count": 0,
     "max_hops": 5
   }

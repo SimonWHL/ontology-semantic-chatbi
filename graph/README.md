@@ -135,7 +135,7 @@ v2:
 
 # DeepSeek API
 deepseek:
-  api_key: "sk-xxx"
+  api_key: "sk-c6362dc8a2d24efe873e203facceedb5"
   base_url: "https://api.deepseek.com/chat/completions"
   model: "deepseek-v4-flash"
 ```

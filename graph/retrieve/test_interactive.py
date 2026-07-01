@@ -92,6 +92,25 @@ def _get_subgraph_builder():
     return build_subgraph_v1, {}, retriever
 
 
+def _merge_sql_edges(subgraph: dict, all_sql_edges: list) -> dict:
+    """子图生成完成后再合并相关 SQL 边。
+
+    SQL 边只用于最终展示和上下文补充，不参与 v2 路径搜索，避免连接爆炸。
+    """
+    sub_labels = {n.label if hasattr(n, "label") else n.get("label") for n in subgraph.get("nodes", [])}
+    relevant_sql_edges = [
+        e for e in all_sql_edges
+        if e.from_label in sub_labels and e.to_label in sub_labels
+    ]
+    if not relevant_sql_edges:
+        return dict(subgraph)
+    return {
+        **subgraph,
+        "edges": subgraph.get("edges", []) + relevant_sql_edges,
+        "sql_edge_count": len(relevant_sql_edges),
+    }
+
+
 # ═══════════════════════════════════════════════════════════════
 # 1. 路径文本格式化（人类可读）
 # ═══════════════════════════════════════════════════════════════
@@ -336,6 +355,7 @@ def main():
             subgraph = subgraph_fn(entities, index, max_hops=max_hops, sql_edges=graph_with_sql.edges, **extra_kwargs)
         else:
             subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
+        subgraph = _merge_sql_edges(subgraph, graph_with_sql.edges)
 
         # ── 输出路径 1: 紧凑路径文本 ──
         paths_text = format_paths_text(entities, subgraph, index.graph.node_map)

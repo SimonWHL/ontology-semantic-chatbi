@@ -3,18 +3,19 @@
   "entities": [
     "已签商机",
     "出库金额",
-    "城市"
+    "城市",
+    "商机",
+    "出库明细"
   ],
   "subgraph": {
     "nodes": [
       {
-        "label": "城市",
-        "type": "Attribute",
-        "color": "#60a5fa",
-        "description": "业绩地市",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_performance_city",
-        "column": "performance_city"
+        "label": "已签商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
+        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
+        "expr": "first_signature_date is not null"
       },
       {
         "label": "商机",
@@ -36,6 +37,16 @@
         "data_type": "datetime"
       },
       {
+        "label": "首次下单",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "商机的第一次下单日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_order_date",
+        "column": "first_order_date",
+        "data_type": "datetime"
+      },
+      {
         "label": "出库明细",
         "type": "Entity",
         "color": "#60a5fa",
@@ -45,12 +56,23 @@
         "foreign_entity": "opportunity_id"
       },
       {
-        "label": "已签商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
-        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
-        "expr": "first_signature_date is not null"
+        "label": "首次签章",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "商机合同的签章日期，空为未签",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_signature_date",
+        "column": "first_signature_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "城市",
+        "type": "Attribute",
+        "color": "#60a5fa",
+        "description": "业绩地市",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_performance_city",
+        "column": "performance_city"
       },
       {
         "label": "出库金额",
@@ -95,48 +117,123 @@
         "to": "出库金额",
         "label": "measured_by",
         "display_label": "被度量"
+      },
+      {
+        "from": "已签商机",
+        "to": "首次签章",
+        "label": "constrains",
+        "display_label": "first_signature_date非空"
+      },
+      {
+        "from": "商机",
+        "to": "首次签章",
+        "label": "has_event",
+        "display_label": "经历事件"
+      },
+      {
+        "from": "首次签章",
+        "to": "首次下单",
+        "label": "state_transition",
+        "display_label": "事件流转"
+      },
+      {
+        "from": "首次下单",
+        "to": "首次出库",
+        "label": "state_transition",
+        "display_label": "事件流转"
+      },
+      {
+        "from": "商机",
+        "to": "城市",
+        "label": "has_attribute",
+        "display_label": "位于"
+      },
+      {
+        "from": "商机",
+        "to": "出库明细",
+        "label": "relates_to",
+        "display_label": "通过opportunity_id关联",
+        "join_key": "opportunity_id"
+      },
+      {
+        "from": "出库明细",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
+      },
+      {
+        "from": "商机",
+        "to": "首次签章",
+        "label": "has_event",
+        "display_label": "经历事件"
+      },
+      {
+        "from": "商机",
+        "to": "首次下单",
+        "label": "has_event",
+        "display_label": "经历事件"
+      },
+      {
+        "from": "商机",
+        "to": "首次出库",
+        "label": "has_event",
+        "display_label": "经历事件"
+      },
+      {
+        "from": "首次签章",
+        "to": "首次下单",
+        "label": "state_transition",
+        "display_label": "事件流转"
+      },
+      {
+        "from": "首次下单",
+        "to": "首次出库",
+        "label": "state_transition",
+        "display_label": "事件流转"
+      },
+      {
+        "from": "已签商机",
+        "to": "首次签章",
+        "label": "constrains",
+        "display_label": "first_signature_date非空"
+      },
+      {
+        "from": "首次出库",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
+      },
+      {
+        "from": "城市",
+        "to": "出库金额",
+        "label": "where",
+        "display_label": "作为过滤条件",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "dimension_filter"
+      },
+      {
+        "from": "城市",
+        "to": "出库金额",
+        "label": "group_by",
+        "display_label": "作为分组维度",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "dimension_group"
+      },
+      {
+        "from": "已签商机",
+        "to": "出库金额",
+        "label": "where",
+        "display_label": "业务口径过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "concept_filter",
+        "expr": "first_signature_date is not null"
       }
     ]
   },
   "paths": [
-    {
-      "between": [
-        "出库金额",
-        "已签商机"
-      ],
-      "nodes": [
-        "出库金额",
-        "已签商机"
-      ],
-      "edges": [
-        {
-          "from": "已签商机",
-          "to": "出库金额",
-          "label": "where",
-          "display_label": "业务口径过滤"
-        }
-      ],
-      "level": 0
-    },
-    {
-      "between": [
-        "出库金额",
-        "城市"
-      ],
-      "nodes": [
-        "出库金额",
-        "城市"
-      ],
-      "edges": [
-        {
-          "from": "城市",
-          "to": "出库金额",
-          "label": "where",
-          "display_label": "作为过滤条件"
-        }
-      ],
-      "level": 0
-    },
     {
       "between": [
         "城市",
@@ -168,7 +265,8 @@
           "display_label": "被度量"
         }
       ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
     },
     {
       "between": [
@@ -201,108 +299,228 @@
           "display_label": "被度量"
         }
       ],
-      "level": 0
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "已签商机",
+        "出库金额"
+      ],
+      "nodes": [
+        "已签商机",
+        "首次签章",
+        "商机",
+        "出库明细",
+        "出库金额"
+      ],
+      "edges": [
+        {
+          "from": "已签商机",
+          "to": "首次签章",
+          "label": "constrains",
+          "display_label": "first_signature_date非空"
+        },
+        {
+          "from": "商机",
+          "to": "首次签章",
+          "label": "has_event",
+          "display_label": "经历事件"
+        },
+        {
+          "from": "商机",
+          "to": "出库明细",
+          "label": "relates_to",
+          "display_label": "通过opportunity_id关联"
+        },
+        {
+          "from": "出库明细",
+          "to": "出库金额",
+          "label": "measured_by",
+          "display_label": "被度量"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "已签商机",
+        "出库金额"
+      ],
+      "nodes": [
+        "已签商机",
+        "首次签章",
+        "首次下单",
+        "首次出库",
+        "出库金额"
+      ],
+      "edges": [
+        {
+          "from": "已签商机",
+          "to": "首次签章",
+          "label": "constrains",
+          "display_label": "first_signature_date非空"
+        },
+        {
+          "from": "首次签章",
+          "to": "首次下单",
+          "label": "state_transition",
+          "display_label": "事件流转"
+        },
+        {
+          "from": "首次下单",
+          "to": "首次出库",
+          "label": "state_transition",
+          "display_label": "事件流转"
+        },
+        {
+          "from": "首次出库",
+          "to": "出库金额",
+          "label": "measured_by",
+          "display_label": "被度量"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
     }
   ],
   "isolated": [],
   "capability": "\n## 维度-指标分析能力\n  城市 [Attribute]:\n   出库金额 (可作为分组维度、可作为过滤条件)\n  已签商机 [Concept/Filter]:\n   出库金额 (可作为过滤条件)\n\n  出库金额 可被以下维度/概念分析: 城市, 已签商机",
   "hierarchy": {
+    "strategy": "lca_guided_v2_no_sql_path",
     "num_levels": 2,
     "matched_levels": {
       "0": [
         "已签商机",
         "出库金额",
-        "城市"
+        "城市",
+        "商机",
+        "出库明细"
       ],
       "1": [
-        "业务维度",
-        "商机阶段",
-        "出库金额"
+        "Concept/Filter簇1",
+        "Metric簇10",
+        "Attribute簇0",
+        "Entity簇3"
       ]
     },
+    "lca_groups": [
+      {
+        "lca": "Entity簇3",
+        "entities": [
+          "商机",
+          "出库明细"
+        ],
+        "scope": "pair"
+      }
+    ],
+    "searched_pairs": [
+      [
+        "商机",
+        "出库明细"
+      ],
+      [
+        "出库明细",
+        "出库金额"
+      ],
+      [
+        "商机",
+        "出库金额"
+      ],
+      [
+        "城市",
+        "出库金额"
+      ],
+      [
+        "已签商机",
+        "出库金额"
+      ]
+    ],
+    "sql_policy": "SQL edges are excluded during path construction and should be merged after subgraph retrieval.",
     "abstract_nodes": [
       {
-        "label": "业务维度",
-        "description": "一组用于业务分析的分类属性，涵盖地域、行业、产品等核心维度。",
+        "label": "Attribute簇0",
+        "description": "4个Attribute节点的语义聚合",
         "level": 1,
         "member_count": 4
       },
       {
-        "label": "商机阶段",
-        "description": "商机从新建到赢单或未中标等不同状态的分类与过滤条件",
+        "label": "Concept/Filter簇1",
+        "description": "6个Concept/Filter节点的语义聚合",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "大额商机",
-        "description": "出库额达到10万元以上的规模以上商机，代表高价值业务机会",
+        "label": "Concept/Filter簇2",
+        "description": "1个Concept/Filter节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "销售业务实体",
-        "description": "涵盖销售过程中从商机、客户到出库明细的核心业务实体",
+        "label": "Entity簇3",
+        "description": "3个Entity节点的语义聚合",
         "level": 1,
         "member_count": 3
       },
       {
-        "label": "商机关键日期",
-        "description": "商机生命周期中从创建到出库的重要时间节点",
+        "label": "Event簇4",
+        "description": "5个Event节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "投标结果",
-        "description": "表示投标活动的结果状态，包括中标和未中标两种情况。",
+        "label": "Event簇5",
+        "description": "2个Event节点的语义聚合",
         "level": 1,
         "member_count": 2
       },
       {
-        "label": "聚合函数",
-        "description": "一组用于对数据进行汇总、计数、极值及差值计算的操作函数。",
+        "label": "Function簇6",
+        "description": "5个Function节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "聚合函数_7",
-        "description": "对一组数值进行统计汇总的数学函数，如计算平均值等。",
+        "label": "Function簇7",
+        "description": "1个Function节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "数据统计函数",
-        "description": "一组用于分析数据变化、比例、排序关系的常用计算函数或业务指标",
+        "label": "Function簇8",
+        "description": "5个Function节点的语义聚合",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "商机度量",
-        "description": "涵盖商机金额、数量及其去重处理的度量指标集合",
+        "label": "Metric簇9",
+        "description": "6个Metric节点的语义聚合",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "出库金额",
-        "description": "指出库过程中产生的交货总金额等度量数据，来源于出库明细域。",
+        "label": "Metric簇10",
+        "description": "1个Metric节点的语义聚合",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "指标分类",
-        "description": "对业务指标按类型进行逻辑分组的类别，如金额类和数量类。",
+        "label": "MetricCategory簇11",
+        "description": "2个MetricCategory节点的语义聚合",
         "level": 1,
         "member_count": 2
       }
     ],
     "path_dedup_stats": {
-      "original_count": 68,
+      "original_count": 8,
       "deduped_count": 4,
-      "reduction_ratio": "94%"
+      "reduction_ratio": "50%"
     }
   },
   "meta": {
-    "total_nodes": 6,
-    "total_edges": 5,
+    "total_nodes": 8,
+    "total_edges": 22,
     "total_paths": 4,
     "isolated_count": 0,
     "max_hops": 5

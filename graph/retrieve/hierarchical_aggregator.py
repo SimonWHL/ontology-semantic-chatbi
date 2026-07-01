@@ -78,6 +78,14 @@ class HierarchicalGraph:
     g0_embeddings: Optional[Dict[str, List[float]]] = None
     g0_clusters: Optional[Dict[int, List[str]]] = None
 
+    # 可导航层级索引：用于 ancestor / LCA 检索。
+    # parent_of: child label -> parent abstract labels
+    # children_of: abstract label -> direct children labels
+    # level_of: every known label -> hierarchy level
+    parent_of: Dict[str, List[str]] = field(default_factory=dict)
+    children_of: Dict[str, List[str]] = field(default_factory=dict)
+    level_of: Dict[str, int] = field(default_factory=dict)
+
     @property
     def num_levels(self) -> int:
         return len(self.layers)
@@ -493,6 +501,9 @@ def build_hierarchical_graph(
             print(f"  [Build] 缓存不存在, 首次构建分层图谱（约需 60~95 秒）...")
 
     hg = HierarchicalGraph()
+    hg.level_of = {n.label: 0 for n in graph.nodes}
+    hg.parent_of = {n.label: [] for n in graph.nodes}
+    hg.children_of = {}
     
     # ── G0: 原始图谱 ──
     hg.layers.append({
@@ -610,6 +621,12 @@ def build_hierarchical_graph(
             )
             abstract_nodes.append(an)
             hg.abstract_nodes.append(an)
+            hg.level_of[abstract_label] = level
+            hg.children_of[abstract_label] = list(member_labels)
+            for child_label in member_labels:
+                hg.parent_of.setdefault(child_label, [])
+                if abstract_label not in hg.parent_of[child_label]:
+                    hg.parent_of[child_label].append(abstract_label)
 
         print(f"  [Level {level}] 生成 {len(abstract_nodes)} 个抽象概念")
 
@@ -844,30 +861,119 @@ def _load_hierarchical_from_cache(cache_path: Path, g0_graph: SemanticGraph) -> 
 # 分层检索:在多层图谱上匹配实体并查找路径
 # ══════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════
+# 分层检索:可导航索引、LCA 和路径搜索
+# ══════════════════════════════════════════════════════════════
+
+def _ensure_navigation_index(hg: HierarchicalGraph, g0_graph: SemanticGraph) -> None:
+    """确保分层图谱具备 child/parent/level 导航索引。
+
+    旧缓存中可能没有这些字段，因此在检索入口统一补齐。
+    """
+    if not getattr(hg, "level_of", None):
+        hg.level_of = {}
+    if not getattr(hg, "parent_of", None):
+        hg.parent_of = {}
+    if not getattr(hg, "children_of", None):
+        hg.children_of = {}
+
+    for n in g0_graph.nodes:
+        hg.level_of.setdefault(n.label, 0)
+        hg.parent_of.setdefault(n.label, [])
+
+    for an in hg.abstract_nodes:
+        hg.level_of[an.label] = an.level
+        hg.children_of[an.label] = list(an.member_labels)
+        hg.parent_of.setdefault(an.label, [])
+        for child in an.member_labels:
+            hg.parent_of.setdefault(child, [])
+            if an.label not in hg.parent_of[child]:
+                hg.parent_of[child].append(an.label)
+
+
+def _ancestor_distances(label: str, hg: HierarchicalGraph) -> Dict[str, int]:
+    """返回 label 到所有祖先的最短上行距离，包含自身距离 0。"""
+    distances = {label: 0}
+    queue = [(label, 0)]
+    while queue:
+        current, dist = queue.pop(0)
+        for parent in hg.parent_of.get(current, []):
+            if parent not in distances or dist + 1 < distances[parent]:
+                distances[parent] = dist + 1
+                queue.append((parent, dist + 1))
+    return distances
+
+
+def _find_lca_for_entities(entities: List[str], hg: HierarchicalGraph) -> Optional[str]:
+    """寻找一组实体的最低公共祖先。"""
+    if not entities:
+        return None
+    ancestor_maps = [_ancestor_distances(e, hg) for e in entities]
+    common = set(ancestor_maps[0])
+    for amap in ancestor_maps[1:]:
+        common &= set(amap)
+    if not common:
+        return None
+    return min(
+        common,
+        key=lambda a: (-hg.level_of.get(a, 0), sum(amap.get(a, 10**6) for amap in ancestor_maps), a),
+    )
+
+
+def _find_group_lcas(entities: List[str], hg: HierarchicalGraph) -> List[dict]:
+    """生成全局 LCA 与 pair LCA，用于跨社区结构化检索。"""
+    groups: List[dict] = []
+    global_lca = _find_lca_for_entities(entities, hg)
+    if global_lca and global_lca not in entities:
+        groups.append({"lca": global_lca, "entities": list(entities), "scope": "global"})
+
+    seen = set()
+    for i in range(len(entities)):
+        for j in range(i + 1, len(entities)):
+            pair = [entities[i], entities[j]]
+            lca = _find_lca_for_entities(pair, hg)
+            if not lca or lca in pair:
+                continue
+            key = (lca, tuple(sorted(pair)))
+            if key in seen:
+                continue
+            seen.add(key)
+            groups.append({"lca": lca, "entities": pair, "scope": "pair"})
+    return groups
+
+
+def _semantic_distance(a: str, b: str, hg: HierarchicalGraph) -> int:
+    """基于祖先链的语义距离，用于 LCA-guided pair 排序。"""
+    aa = _ancestor_distances(a, hg)
+    bb = _ancestor_distances(b, hg)
+    common = set(aa) & set(bb)
+    if not common:
+        return 10**6
+    return min(aa[x] + bb[x] for x in common)
+
+
 def _match_in_hierarchical(
     entities: List[str],
     hg: HierarchicalGraph,
     g0_node_map: Dict[str, Node],
 ) -> Dict[int, List[str]]:
-    """在多层图谱中匹配实体.
+    """在多层图谱中匹配实体。
 
-    返回 {level: [matched_labels, ...]}
-    level=0 匹配 G0 原始实体
-    level=1+ 匹配抽象概念(通过 member_labels 反向查找)
+    使用 parent_of 逐级上溯，而不是只看一层 member_labels，保证 G2/G3 等高层也可被检索利用。
     """
     matched: Dict[int, List[str]] = defaultdict(list)
+    seen: Dict[int, Set[str]] = defaultdict(set)
 
-    # G0 匹配
     for e in entities:
         if e in g0_node_map:
             matched[0].append(e)
-
-    # G1+ 匹配:查找哪些抽象节点包含这些实体
-    entity_set = set(entities)
-    for an in hg.abstract_nodes:
-        overlap = entity_set & set(an.member_labels)
-        if overlap:
-            matched[an.level].append(an.label)
+            seen[0].add(e)
+        for anc in _ancestor_distances(e, hg):
+            level = hg.level_of.get(anc, 0)
+            if level <= 0 or anc in seen[level]:
+                continue
+            matched[level].append(anc)
+            seen[level].add(anc)
 
     return dict(matched)
 
@@ -1198,237 +1304,147 @@ def build_hierarchical_subgraph(
     expand_to_g0: bool = True,
     sql_edges: list = None,
 ) -> dict:
-    """在分层图谱上检索子图.
+    """LCA-guided v2 子图检索。
 
-    策略:
-    1. 在各层匹配实体
-    2. 在匹配的最高层找抽象路径(语义骨架)
-    3. 将抽象路径展开回 G0 底层实体(细粒度填充)
-    4. 合并多层路径形成最终子图
-    5. 为有直接 SQL 边的实体对注入 1 跳捷径，避免 BFS 绕路
-
-    Args:
-        entities: 第一阶段实体列表
-        g0_graph: G0 原始图谱
-        hg: 分层聚合图谱
-        max_hops: 最大跳数
-        expand_to_g0: 是否将抽象路径展开回 G0
-        sql_edges: SQL 边列表（可选，用于注入直接捷径）
-
-    Returns:
-        与 build_subgraph 兼容的 dict
+    核心策略：
+    1. 先补齐可导航的 parent/children/level 层级索引；
+    2. 对查询实体计算全局 LCA 和 pair LCA，形成结构化语义骨架；
+    3. 根据 LCA 骨架选择少量高价值 G0 实体对；
+    4. 只在基础知识图谱 G0 的非 SQL 语义边上搜索路径；
+    5. SQL 边不参与任何路径构建，留给子图完成后的后处理合并。
     """
     node_map = g0_graph.node_map
-
-    # 过滤有效实体
     valid_entities = [e for e in entities if e in node_map]
     invalid_entities = [e for e in entities if e not in node_map]
 
     if not valid_entities:
         return {"nodes": [], "edges": [], "paths": [], "isolated": invalid_entities}
 
-    # Step 1: 在各层匹配
+    _ensure_navigation_index(hg, g0_graph)
     matched = _match_in_hierarchical(valid_entities, hg, node_map)
+    lca_groups = _find_group_lcas(valid_entities, hg)
 
-    collected_nodes: Set[str] = set()
-    collected_edges: Dict[Tuple[str, str], Edge] = {}
-    all_paths: List[dict] = []
-
-    # 辅助
-    def _collect_g0_path(path: dict, level: int):
-        nonlocal collected_nodes, collected_edges
-        path["level"] = level
-        all_paths.append(path)
-        for nl in path["nodes"]:
-            collected_nodes.add(nl)
-        for ei in path["edges"]:
-            key = (ei["from"], ei["to"])
-            if key not in collected_edges:
-                for e in g0_graph.edges:
-                    if (e.from_label == ei["from"] and
-                        e.to_label == ei["to"] and
-                        e.label == ei["label"]):
-                        collected_edges[key] = e
-                        break
-
-    def _collect_abstract_path(path: dict, level: int):
-        """收集抽象层路径(不直接添加边,用于指导 G0 展开)."""
-        path["level"] = level
-        all_paths.append(path)
-
-    # Step 2: 在最高抽象层找路径骨架
-    max_matched_level = max(matched.keys()) if matched else 0
-
-    if max_matched_level > 0 and len(hg.layers) > max_matched_level:
-        layer = hg.layers[max_matched_level]
-        layer_matched = matched.get(max_matched_level, [])
-
-        # 在抽象层做两两路径查找
-        if len(layer_matched) >= 2:
-            for i in range(len(layer_matched)):
-                for j in range(i + 1, len(layer_matched)):
-                    paths = _find_paths_in_layer(
-                        layer_matched[i], layer_matched[j],
-                        layer, max_hops=3,
-                    )
-                    for p in paths:
-                        _collect_abstract_path({
-                            "between": [layer_matched[i], layer_matched[j]],
-                            "nodes": p["nodes"],
-                            "edges": p["edges"],
-                        }, max_matched_level)
-
-    # Step 3: 展开抽象路径到 G0 + G0 内路径查找
-    # 找到抽象节点对应的 G0 实体,在 G0 中找路径
-
-    # 构建抽象节点 → G0 成员映射
-    abstract_to_g0: Dict[str, List[str]] = {}
-    for an in hg.abstract_nodes:
-        abstract_to_g0[an.label] = an.member_labels
-
-    # G0 层实体
-    g0_matched = matched.get(0, valid_entities)
-
-    # 分类 G0 实体(复用 v1 的分类逻辑)
     from subgraph_builder import _classify_entities as _classify_v1
-    metric_nodes, constraint_nodes, _ = _classify_v1(g0_matched, node_map)
-
-    # G0 层 BFS 路径查找(复用 v1 的 BFS)
     from subgraph_builder import _bfs_shortest_paths as _bfs_v1
 
-    pairs_to_search = []
+    metric_nodes, constraint_nodes, other_nodes = _classify_v1(valid_entities, node_map)
 
-    # 指标间
-    if len(metric_nodes) >= 2:
-        for i in range(len(metric_nodes)):
-            for j in range(i + 1, len(metric_nodes)):
-                pairs_to_search.append((metric_nodes[i], metric_nodes[j]))
+    def _add_pair(pairs: List[Tuple[str, str]], a: str, b: str) -> None:
+        if a == b:
+            return
+        if a not in node_map or b not in node_map:
+            return
+        key = tuple(sorted([a, b]))
+        if key not in {tuple(sorted(x)) for x in pairs}:
+            pairs.append((a, b))
 
-    # 约束→指标
-    for c in constraint_nodes:
+    candidate_pairs: List[Tuple[str, str]] = []
+
+    # 查询目标优先：指标间、约束到指标。
+    for i in range(len(metric_nodes)):
+        for j in range(i + 1, len(metric_nodes)):
+            _add_pair(candidate_pairs, metric_nodes[i], metric_nodes[j])
+
+    for c in constraint_nodes + other_nodes:
         for m in metric_nodes:
-            pairs_to_search.append((c, m))
+            _add_pair(candidate_pairs, c, m)
 
-    # 没有指标时约束间
-    if not metric_nodes and len(constraint_nodes) >= 2:
-        for i in range(len(constraint_nodes)):
-            for j in range(i + 1, len(constraint_nodes)):
-                pairs_to_search.append((constraint_nodes[i], constraint_nodes[j]))
+    # 若没有指标，退化为 LCA-guided 约束间结构搜索。
+    if not metric_nodes:
+        for i in range(len(valid_entities)):
+            for j in range(i + 1, len(valid_entities)):
+                _add_pair(candidate_pairs, valid_entities[i], valid_entities[j])
+
+    # LCA 补充：对同一 LCA 语义社区内的实体保留结构化连接。
+    for group in lca_groups:
+        group_entities = [e for e in group.get("entities", []) if e in node_map]
+        group_metrics = [e for e in group_entities if e in metric_nodes]
+        group_context = [e for e in group_entities if e not in group_metrics]
+        if group_metrics:
+            for c in group_context:
+                for m in group_metrics:
+                    _add_pair(candidate_pairs, c, m)
+        else:
+            for i in range(len(group_entities)):
+                for j in range(i + 1, len(group_entities)):
+                    _add_pair(candidate_pairs, group_entities[i], group_entities[j])
+
+    candidate_pairs.sort(key=lambda ab: (_semantic_distance(ab[0], ab[1], hg), ab[0], ab[1]))
+
+    # 控制扁平搜索退化：LCA 负责排序与剪枝，只展开最有结构价值的 pair。
+    max_pairs = max(8, len(valid_entities) * 4)
+    pairs_to_search = candidate_pairs[:max_pairs]
+
+    all_paths: List[dict] = []
+    semantic_index = _build_simple_index(g0_graph)
 
     for a, b in pairs_to_search:
         paths = _bfs_v1(
-            _build_simple_index(g0_graph), a, b,
-            max_hops=max_hops, max_paths=2,
-            include_sql_edges=True,
+            semantic_index,
+            a,
+            b,
+            max_hops=max_hops,
+            max_paths=2,
+            include_sql_edges=False,
         )
-        for p in paths:
-            _collect_g0_path({
+        for pth in paths:
+            all_paths.append({
                 "between": [a, b],
-                "nodes": p["nodes"],
-                "edges": p["edges"],
-            }, 0)
+                "nodes": pth["nodes"],
+                "edges": pth["edges"],
+                "level": 0,
+                "guided_by_lca": _find_lca_for_entities([a, b], hg),
+            })
 
-    # Step 4: 如果有抽象路径,也把抽象节点对应的 G0 成员间路径加入
-    for path in all_paths:
-        if path.get("level", 0) > 0:
-            # 这是抽象路径,展开成员到成员
-            abstract_nodes_in_path = path.get("nodes", [])
-            for i in range(len(abstract_nodes_in_path) - 1):
-                a1 = abstract_nodes_in_path[i]
-                a2 = abstract_nodes_in_path[i + 1]
-                members1 = abstract_to_g0.get(a1, [])
-                members2 = abstract_to_g0.get(a2, [])
-                # 取交集成员(被问题匹配到的)
-                rel_members1 = [m for m in members1 if m in valid_entities] or members1[:2]
-                rel_members2 = [m for m in members2 if m in valid_entities] or members2[:2]
-                for m1 in rel_members1[:2]:
-                    for m2 in rel_members2[:2]:
-                        if m1 == m2:
-                            continue
-                        paths = _bfs_v1(
-                            _build_simple_index(g0_graph), m1, m2,
-                            max_hops=max_hops, max_paths=1,
-                            include_sql_edges=True,
-                        )
-                        for p in paths:
-                            _collect_g0_path({
-                                "between": [m1, m2],
-                                "nodes": p["nodes"],
-                                "edges": p["edges"],
-                            }, 0)
+    deduped_paths = deduplicate_paths(
+        all_paths,
+        max_per_pair=2,
+        node_map=node_map,
+        entities=valid_entities,
+    )
 
-    # ── SQL 捷径注入：为有直接 SQL 边的实体对补 1 跳路径 ──
-    # 问题：BFS 图不含 SQL 边，导致 行业→去重商机金额 的 1 跳直连不可见，
-    #       BFS 被迫走 行业→出库明细→商机→... 的 6 跳绕路，拉入无关领域节点。
-    # 修复：对 validated entities 中任意有直接 SQL 边的 pair，注入合成 1 跳路径，
-    #       后续 deduplicate_paths 会自然偏好短路径，挤掉绕路噪声。
-    if sql_edges:
-        # 构建实体对 → 直连 SQL 边的映射
-        direct_sql_pairs: dict = {}  # key: sorted (a, b), value: list of edges
-        for se in sql_edges:
-            f, t = se.from_label, se.to_label
-            if f in valid_entities and t in valid_entities:
-                key = tuple(sorted([f, t]))
-                direct_sql_pairs.setdefault(key, []).append(se)
+    collected_nodes: Set[str] = set()
+    collected_edges: Dict[Tuple[str, str, str], Edge] = {}
 
-        for (a, b), edges in direct_sql_pairs.items():
-            for se in edges:
-                synthetic = {
-                    "between": [a, b],
-                    "nodes": [a, b],
-                    "edges": [{
-                        "from": se.from_label,
-                        "to": se.to_label,
-                        "label": se.label,
-                        "display_label": se.display_label or se.label,
-                    }],
-                }
-                _collect_g0_path(synthetic, 0)
+    for pth in deduped_paths:
+        for nl in pth.get("nodes", []):
+            if nl in node_map:
+                collected_nodes.add(nl)
+        for ei in pth.get("edges", []):
+            key = (ei["from"], ei["to"], ei.get("label", ""))
+            if key in collected_edges:
+                continue
+            for edge in g0_graph.edges:
+                if edge.sql_edge:
+                    continue
+                if (edge.from_label == ei["from"]
+                        and edge.to_label == ei["to"]
+                        and edge.label == ei.get("label")):
+                    collected_edges[key] = edge
+                    break
 
-    # ── 路径去重优化 ──
-    deduped_paths = deduplicate_paths(all_paths, max_per_pair=2, node_map=node_map, entities=entities)
-
-    # 根据去重后的路径重建 collected_nodes / collected_edges
-    # （去掉那些仅出现在被删除路径中的节点和边）
-    deduped_collected_nodes: Set[str] = set()
-    deduped_collected_edges: Dict[Tuple[str, str], Edge] = {}
-
-    # 合并所有边用于查找（g0 语义边 + sql 边）
-    _all_edge_pool = list(g0_graph.edges) + (list(sql_edges) if sql_edges else [])
-    for p in deduped_paths:
-        for nl in p.get("nodes", []):
-            deduped_collected_nodes.add(nl)
-        for ei in p.get("edges", []):
-            key = (ei["from"], ei["to"])
-            if key not in deduped_collected_edges:
-                for e in _all_edge_pool:
-                    if (e.from_label == ei["from"]
-                            and e.to_label == ei["to"]
-                            and e.label == ei["label"]):
-                        deduped_collected_edges[key] = e
-                        break
-
-    # 孤立节点(在去重后路径中不再出现的实体)
     nodes_in_paths: Set[str] = set()
-    for p in deduped_paths:
-        nodes_in_paths.update(p.get("nodes", []))
+    for pth in deduped_paths:
+        nodes_in_paths.update(n for n in pth.get("nodes", []) if n in node_map)
     isolated = [e for e in valid_entities if e not in nodes_in_paths]
 
     return {
-        "nodes": [node_map[n] for n in deduped_collected_nodes if n in node_map],
-        "edges": list(deduped_collected_edges.values()),
+        "nodes": [node_map[n] for n in collected_nodes if n in node_map],
+        "edges": list(collected_edges.values()),
         "paths": deduped_paths,
-        "isolated": isolated,
-        # 额外:分层信息
+        "isolated": isolated + invalid_entities,
         "hierarchy": {
+            "strategy": "lca_guided_v2_no_sql_path",
             "num_levels": hg.num_levels,
             "matched_levels": {str(k): v for k, v in matched.items()},
+            "lca_groups": lca_groups,
+            "searched_pairs": [list(p) for p in pairs_to_search],
+            "sql_policy": "SQL edges are excluded during path construction and should be merged after subgraph retrieval.",
             "abstract_nodes": [
                 {"label": an.label, "description": an.description,
                  "level": an.level, "member_count": len(an.member_labels)}
                 for an in hg.abstract_nodes
             ],
-            # 去重统计
             "path_dedup_stats": {
                 "original_count": len(all_paths),
                 "deduped_count": len(deduped_paths),
@@ -1439,7 +1455,6 @@ def build_hierarchical_subgraph(
             },
         },
     }
-
 
 def _build_simple_index(g0_graph: SemanticGraph):
     """为 G0 图构建简化索引(供 BFS 使用)."""

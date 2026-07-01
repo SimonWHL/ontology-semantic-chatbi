@@ -21,8 +21,8 @@
     "nodes": 12,
     "edges": 38,
     "sql_edges": 23,
-    "paths": 10,
-    "elapsed_s": 95.73,
+    "paths": 8,
+    "elapsed_s": 6.58,
     "json": "01_嘉兴市大项目商机数量和出库金额占比.json",
     "html": "01_嘉兴市大项目商机数量和出库金额占比.html"
   },
@@ -46,8 +46,8 @@
     "nodes": 9,
     "edges": 27,
     "sql_edges": 19,
-    "paths": 6,
-    "elapsed_s": 1.57,
+    "paths": 4,
+    "elapsed_s": 1.68,
     "json": "02_杭州互联网行业在途商机总金额.json",
     "html": "02_杭州互联网行业在途商机总金额.html"
   },
@@ -58,7 +58,8 @@
       "赢单商机",
       "商机金额",
       "产品类别",
-      "城市"
+      "城市",
+      "商机"
     ],
     "attr": [
       "产品类别",
@@ -66,13 +67,14 @@
     ],
     "safe": [
       "赢单商机",
-      "商机金额"
+      "商机金额",
+      "商机"
     ],
     "nodes": 8,
     "edges": 15,
     "sql_edges": 8,
     "paths": 4,
-    "elapsed_s": 1.4,
+    "elapsed_s": 1.7,
     "json": "03_深圳地区服务器产品线赢单商机金额.json",
     "html": "03_深圳地区服务器产品线赢单商机金额.html"
   },
@@ -96,8 +98,8 @@
     "nodes": 11,
     "edges": 48,
     "sql_edges": 37,
-    "paths": 7,
-    "elapsed_s": 1.49,
+    "paths": 4,
+    "elapsed_s": 1.42,
     "json": "04_各行业的在途商机去重金额是多少.json",
     "html": "04_各行业的在途商机去重金额是多少.html"
   },
@@ -117,11 +119,11 @@
       "同比",
       "增长率"
     ],
-    "nodes": 11,
-    "edges": 29,
-    "sql_edges": 16,
-    "paths": 6,
-    "elapsed_s": 1.4,
+    "nodes": 12,
+    "edges": 33,
+    "sql_edges": 18,
+    "paths": 7,
+    "elapsed_s": 1.42,
     "json": "05_商机数量和出库金额的同比增长率.json",
     "html": "05_商机数量和出库金额的同比增长率.html"
   },
@@ -131,20 +133,24 @@
     "entities": [
       "已签商机",
       "出库金额",
-      "城市"
+      "城市",
+      "商机",
+      "出库明细"
     ],
     "attr": [
       "城市"
     ],
     "safe": [
       "已签商机",
-      "出库金额"
+      "出库金额",
+      "商机",
+      "出库明细"
     ],
     "nodes": 8,
     "edges": 22,
     "sql_edges": 13,
-    "paths": 6,
-    "elapsed_s": 1.3,
+    "paths": 4,
+    "elapsed_s": 1.38,
     "json": "06_成都地区已签商机的出库金额.json",
     "html": "06_成都地区已签商机的出库金额.html"
   }
