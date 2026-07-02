@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 from sklearn.mixture import GaussianMixture
 
-from loader import Edge, Node, SemanticGraph
+from graph.loader import Edge, Node, SemanticGraph
 
 
 # ══════════════════════════════════════════════════════════════
@@ -206,7 +206,7 @@ def _cluster_by_gmm(
 
 def _load_deepseek_config() -> dict:
     """加载 DeepSeek API 配置."""
-    config_path = Path(__file__).resolve().parent / "config.yaml"
+    config_path = Path(__file__).resolve().parent.parent / "config.yaml"
     if config_path.exists():
         import yaml
         with open(config_path, "r", encoding="utf-8") as f:
@@ -1358,8 +1358,8 @@ def build_hierarchical_subgraph(
     matched = _match_in_hierarchical(valid_entities, hg, node_map)
     lca_groups = _find_group_lcas(valid_entities, hg)
 
-    from subgraph_builder import _classify_entities as _classify_v1
-    from subgraph_builder import _bfs_shortest_paths as _bfs_v1
+    from retrieval.subgraph_builder import _classify_entities as _classify_v1
+    from retrieval.subgraph_builder import _bfs_shortest_paths as _bfs_v1
 
     metric_nodes, constraint_nodes, other_nodes = _classify_v1(valid_entities, node_map)
 
@@ -1565,7 +1565,7 @@ def build_hierarchical_subgraph(
 
 def _build_simple_index(g0_graph: SemanticGraph):
     """为 G0 图构建简化索引(供 BFS 使用)."""
-    from index_builder import GraphIndex
+    from graph.index_builder import GraphIndex
     idx = GraphIndex(graph=g0_graph)
     return idx
 

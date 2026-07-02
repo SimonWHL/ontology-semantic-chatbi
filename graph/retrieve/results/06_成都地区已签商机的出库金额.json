@@ -4,20 +4,10 @@
     "已签商机",
     "出库金额",
     "城市",
-    "商机",
     "出库明细"
   ],
   "subgraph": {
     "nodes": [
-      {
-        "label": "商机",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
-      },
       {
         "label": "出库明细",
         "type": "Entity",
@@ -49,6 +39,23 @@
         "expr": "ZJHZJ_JT"
       },
       {
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
+      },
+      {
+        "label": "已签商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
+        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
+        "expr": "first_signature_date is not null"
+      },
+      {
         "label": "首次出库",
         "type": "Event",
         "color": "#f8fb60",
@@ -76,14 +83,6 @@
         "cube": "cube_kpi_opportunity",
         "dimension": "dim_performance_city",
         "column": "performance_city"
-      },
-      {
-        "label": "已签商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "首次签章日期非空为已签，语义层暂无对应 filter 文件，建议补充",
-        "dimension": "cube_kpi_opportunity.dim_first_signature_date",
-        "expr": "first_signature_date is not null"
       }
     ],
     "edges": [
@@ -334,37 +333,19 @@
         "已签商机",
         "出库金额",
         "城市",
-        "商机",
         "出库明细"
       ],
       "1": [
-        "Concept/Filter簇1",
-        "Metric簇10",
-        "Attribute簇0",
-        "Entity簇3"
+        "商机状态",
+        "出库金额指标",
+        "业务维度",
+        "销售业务"
       ]
     },
-    "lca_groups": [
-      {
-        "lca": "Entity簇3",
-        "entities": [
-          "商机",
-          "出库明细"
-        ],
-        "scope": "pair"
-      }
-    ],
+    "lca_groups": [],
     "searched_pairs": [
       [
-        "商机",
-        "出库明细"
-      ],
-      [
         "出库明细",
-        "出库金额"
-      ],
-      [
-        "商机",
         "出库金额"
       ],
       [
@@ -379,82 +360,82 @@
     "sql_policy": "SQL edges are excluded during path construction and should be merged after subgraph retrieval.",
     "abstract_nodes": [
       {
-        "label": "Attribute簇0",
-        "description": "4个Attribute节点的语义聚合",
+        "label": "业务维度",
+        "description": "用于描述销售与出库业务场景的多维属性，支撑按地域、行业及产品等视角的精细化数据分析。",
         "level": 1,
         "member_count": 4
       },
       {
-        "label": "Concept/Filter簇1",
-        "description": "6个Concept/Filter节点的语义聚合",
+        "label": "商机状态",
+        "description": "描述商机在销售生命周期中所处的不同阶段或结果状态，主要用于业务数据的分类与条件筛选。",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "Concept/Filter簇2",
-        "description": "1个Concept/Filter节点的语义聚合",
+        "label": "规模商机",
+        "description": "指在业务中达到特定规模标准（如出库额超十万）的高价值商业机会或潜在客户群体。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "Entity簇3",
-        "description": "3个Entity节点的语义聚合",
+        "label": "销售业务",
+        "description": "记录企业从商机挖掘、客户管理到产品出库的完整销售链路，反映销售运营与交易履约情况。",
         "level": 1,
         "member_count": 3
       },
       {
-        "label": "Event簇4",
-        "description": "5个Event节点的语义聚合",
+        "label": "商机里程碑",
+        "description": "记录商机从创建、签单、下单到出库等销售生命周期中的关键时间节点与里程碑事件。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Event簇5",
-        "description": "2个Event节点的语义聚合",
+        "label": "投标结果",
+        "description": "表示企业参与招投标活动后最终获得的中标或未中标的状态与事件。",
         "level": 1,
         "member_count": 2
       },
       {
-        "label": "Function簇6",
-        "description": "5个Function节点的语义聚合",
+        "label": "指标计算函数",
+        "description": "在数据分析与指标构建中，用于对数据进行汇总、统计及差额计算的核心函数与逻辑。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Function簇7",
-        "description": "1个Function节点的语义聚合",
+        "label": "聚合函数",
+        "description": "对一组数值进行统计计算并返回单一汇总结果的函数，广泛应用于数据库查询与数据分析。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "Function簇8",
-        "description": "5个Function节点的语义聚合",
+        "label": "分析函数",
+        "description": "用于对基础数据进行二次加工、对比、排序及比例计算的常用数据分析与统计计算函数。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Metric簇9",
-        "description": "6个Metric节点的语义聚合",
+        "label": "商机度量指标",
+        "description": "反映商机规模与数量的核心业务度量指标，包含商机金额与商机数的汇总及去重统计计算。",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "Metric簇10",
-        "description": "1个Metric节点的语义聚合",
+        "label": "出库金额指标",
+        "description": "概括出库业务中的金额类度量指标，反映交货或出库环节的总财务价值与业务规模。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "MetricCategory簇11",
-        "description": "2个MetricCategory节点的语义聚合",
+        "label": "指标分类",
+        "description": "按度量类型对业务指标进行的逻辑分组，用于归类和管理金额、数量等具体指标。",
         "level": 1,
         "member_count": 2
       }
     ],
     "path_dedup_stats": {
-      "original_count": 8,
+      "original_count": 5,
       "deduped_count": 4,
-      "reduction_ratio": "50%"
+      "reduction_ratio": "20%"
     }
   },
   "meta": {

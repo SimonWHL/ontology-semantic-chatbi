@@ -13,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from loader import Edge, SemanticGraph
+from graph.loader import Edge, SemanticGraph
 
 
 # ── 数据模型 ──

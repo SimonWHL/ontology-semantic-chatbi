@@ -22,9 +22,17 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from loader import Node
+from graph.loader import Node
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class LLMError(Exception):
+    """LLM 调用异常，携带 HTTP 状态码和响应体用于诊断。"""
+    def __init__(self, message: str, status_code: int = 0, response_body: str = ""):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response_body = response_body
 
 # ============================================================
 # 规则匹配配置
@@ -197,7 +205,7 @@ class EntityExtractor:
 
         # 尝试从 pickle 加载
         if self._cache_path and self._graph_path:
-            from embedding_store import load_cache
+            from extraction.embedding_store import load_cache
             cache = load_cache(self._cache_path, self._graph_path, model_name)
             if cache is not None:
                 self._node_embeddings = cache["node_embeddings"]
@@ -275,7 +283,7 @@ class EntityExtractor:
         # ── 写 pickle 缓存 ──
         if self._cache_path and self._graph_path:
             try:
-                from embedding_store import _compute_graph_fingerprint
+                from extraction.embedding_store import _compute_graph_fingerprint
                 cache_data = {
                     "model_name": model_name,
                     "graph_fingerprint": _compute_graph_fingerprint(self._graph_path),
@@ -762,8 +770,8 @@ class EntityExtractor:
         llm_cfg = self._load_llm_config()
         api_key = llm_cfg["api_key"]
         if not api_key or api_key == "your-deepseek-api-key-here":
-            print("[WARN] 请先在 config.yaml 中配置 deepseek.api_key")
-            return candidates
+            print("[LLM] ❌ 未配置 API key，LLM 精筛不可用，请检查 config.yaml")
+            return []
 
         rule_entities = rule_entities or []
 
@@ -834,12 +842,12 @@ class EntityExtractor:
         candidate_set = set(candidates)
         return [e for e in result if e in candidate_set]
 
-    def _call_llm(self, prompt: str, max_tokens: int = 4096) -> List[str]:
-        """统一的 LLM 调用封装。"""
+    def _call_llm(self, prompt: str, max_tokens: int = 4096, _attempt: int = 0) -> List[str]:
+        """统一的 LLM 调用封装，失败时抛出 LLMError 携带状态码。"""
         llm_cfg = self._load_llm_config()
         api_key = llm_cfg["api_key"]
         if not api_key or api_key == "your-deepseek-api-key-here":
-            return []
+            raise LLMError("未配置 API key，请在 config.yaml 中设置 deepseek.api_key")
 
         try:
             import requests
@@ -878,10 +886,25 @@ class EntityExtractor:
             entities = json.loads(content)
             if isinstance(entities, list):
                 return [e for e in entities if e in self.node_labels]
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if hasattr(e, 'response') and e.response else 0
+            body = ""
+            try:
+                body = e.response.text[:300] if e.response else ""
+            except Exception:
+                pass
+            raise LLMError(f"HTTP {status}: {body}", status_code=status, response_body=body) from e
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if _attempt < 1:
+                print(f"  [LLM] 连接失败，1s 后重试... (attempt {_attempt + 1}/2)")
+                import time
+                time.sleep(1)
+                return self._call_llm(prompt, max_tokens, _attempt=_attempt + 1)
+            raise LLMError(f"连接失败（已重试2次）: {e}") from e
+        except LLMError:
+            raise
         except Exception as e:
-            print(f"[WARN] LLM 调用失败: {e}")
-
-        return []
+            raise LLMError(f"LLM 调用异常: {e}") from e
 
     def _filter_derived_metrics(self, entities: List[str], question: str) -> List[str]:
         """泛化去重：如果同时选了基础指标和派生指标，且问题未明确提派生指标，则去派生。

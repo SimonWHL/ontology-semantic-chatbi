@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
-from loader import Edge, Node, SemanticGraph
+from graph.loader import Edge, Node, SemanticGraph
 
 
 @dataclass

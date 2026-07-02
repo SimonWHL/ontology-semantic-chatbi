@@ -10,8 +10,8 @@
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
-from index_builder import GraphIndex, _tokenize
-from loader import Edge, Node
+from graph.index_builder import GraphIndex, _tokenize
+from graph.loader import Edge, Node
 
 
 # ============================================================

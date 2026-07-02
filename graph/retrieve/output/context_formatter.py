@@ -5,7 +5,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from loader import Edge, Node
+from graph.loader import Edge, Node
 
 
 def format_context(

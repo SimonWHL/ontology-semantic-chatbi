@@ -1,8 +1,12 @@
-<!DOCTYPE html>
+"""HTML可视化生成，供 test_batch.py 和 test_interactive.py 共用。"""
+import json
+from pathlib import Path
+
+VIS_HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>git fetch origin guo</title>
+<title>__TITLE__</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Microsoft YaHei', sans-serif; background: #1a1a2e; overflow: hidden; }
@@ -44,8 +48,8 @@ svg:active { cursor: grabbing; }
 <body>
 <div id="container">
   <svg id="graph"></svg>
-  <div class="title">git fetch origin guo</div>
-  <div class="subtitle">实体: 0 节点, 0 边</div>
+  <div class="title">__TITLE__</div>
+  <div class="subtitle">__DESC__</div>
   <div class="legend" id="legend"></div>
   <div class="panel" id="panel"></div>
   <div class="toggle-bar">
@@ -57,7 +61,7 @@ svg:active { cursor: grabbing; }
 </div>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-const graphData = {"nodes": [], "edges": []};
+const graphData = __GRAPH_JSON__;
 
 const typeColors = {};
 graphData.nodes.forEach(n => { if (n.type && !(n.type in typeColors)) typeColors[n.type] = n.color; });
@@ -206,3 +210,27 @@ document.getElementById('sqlToggle').addEventListener('change', function() {
 </script>
 </body>
 </html>
+"""
+
+
+def _generate_html(question: str, subgraph: dict, output_path: Path) -> None:
+    """根据子图数据生成交互式可视化 HTML。
+
+    数据格式: {"nodes": [...], "edges": [...]}
+    其中 nodes 含 label/type/color 等，edges 含 from/to/label/display_label 等。
+    """
+    graph_json = json.dumps(subgraph, ensure_ascii=False)
+
+    desc = f"实体: {len(subgraph.get('nodes', []))} 节点, {len(subgraph.get('edges', []))} 边"
+
+    html = (
+        VIS_HTML_TEMPLATE
+        .replace("__GRAPH_JSON__", graph_json)
+        .replace("__TITLE__", question)
+        .replace("__DESC__", desc)
+    )
+    output_path.write_text(html, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

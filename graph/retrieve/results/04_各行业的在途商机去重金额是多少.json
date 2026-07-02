@@ -4,98 +4,11 @@
     "在途商机",
     "去重商机金额",
     "行业",
-    "子行业"
+    "子行业",
+    "商机金额"
   ],
   "subgraph": {
     "nodes": [
-      {
-        "label": "总商机金额",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "未去重的商机总金额（measure label 为商机总金额）",
-        "cube": "cube_kpi_opportunity",
-        "metric": "metric_opportunity_amount_sum_duplicate",
-        "metric_type": "simple",
-        "agg": "SUM",
-        "expr": "ZZOPTYAMT"
-      },
-      {
-        "label": "商机",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
-      },
-      {
-        "label": "商机创建",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "商机创建日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_create_time",
-        "column": "create_time",
-        "data_type": "datetime"
-      },
-      {
-        "label": "在途商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "关、输、赢之外的都是在途商机",
-        "dimension": "cube_kpi_opportunity.dim_opportunity_status",
-        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')",
-        "filter": "filter_in_progress_opportunity",
-        "filter_type": "Dimension"
-      },
-      {
-        "label": "预计签单",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "商机预计出结果日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_expected_sign_date",
-        "column": "expected_sign_date",
-        "data_type": "datetime"
-      },
-      {
-        "label": "客户",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "客户销售信息，客户数量按 SOLD_TO_T 去重计数",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dimension": "dim_sales_employee",
-        "column": "sales_employee_code"
-      },
-      {
-        "label": "行业",
-        "type": "Attribute",
-        "color": "#60a5fa",
-        "description": "最终用户-行业描述（来自出库明细域）",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dimension": "dim_end_user_industry",
-        "column": "end_user_industry"
-      },
-      {
-        "label": "子行业",
-        "type": "Attribute",
-        "color": "#60a5fa",
-        "description": "最终用户-子行业描述（来自出库明细域）",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dimension": "dim_end_user_sub_industry",
-        "column": "end_user_sub_industry"
-      },
-      {
-        "label": "商机金额",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "商机金额，单位万元",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_opportunity_amount",
-        "column": "opportunity_amount",
-        "data_type": "number",
-        "unit": "万元"
-      },
       {
         "label": "去重商机金额",
         "type": "Metric",
@@ -108,15 +21,108 @@
           "metric_opportunity_amount_sum_duplicate",
           "metric_duplicate_opportunity_count"
         ]
+      },
+      {
+        "label": "总商机金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "未去重的商机总金额（measure label 为商机总金额）",
+        "cube": "cube_kpi_opportunity",
+        "metric": "metric_opportunity_amount_sum_duplicate",
+        "metric_type": "simple",
+        "agg": "SUM",
+        "expr": "ZZOPTYAMT"
+      },
+      {
+        "label": "在途商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "关、输、赢之外的都是在途商机",
+        "dimension": "cube_kpi_opportunity.dim_opportunity_status",
+        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')",
+        "filter": "filter_in_progress_opportunity",
+        "filter_type": "Dimension"
+      },
+      {
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
+      },
+      {
+        "label": "客户",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "客户销售信息，客户数量按 SOLD_TO_T 去重计数",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dimension": "dim_sales_employee",
+        "column": "sales_employee_code"
+      },
+      {
+        "label": "子行业",
+        "type": "Attribute",
+        "color": "#60a5fa",
+        "description": "最终用户-子行业描述（来自出库明细域）",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dimension": "dim_end_user_sub_industry",
+        "column": "end_user_sub_industry"
+      },
+      {
+        "label": "商机创建",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "商机创建日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_create_time",
+        "column": "create_time",
+        "data_type": "datetime"
+      },
+      {
+        "label": "行业",
+        "type": "Attribute",
+        "color": "#60a5fa",
+        "description": "最终用户-行业描述（来自出库明细域）",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dimension": "dim_end_user_industry",
+        "column": "end_user_industry"
+      },
+      {
+        "label": "预计签单",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "商机预计出结果日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_expected_sign_date",
+        "column": "expected_sign_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "商机金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "商机金额，单位万元",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_opportunity_amount",
+        "column": "opportunity_amount",
+        "data_type": "number",
+        "unit": "万元"
       }
     ],
     "edges": [
       {
-        "from": "子行业",
-        "to": "行业",
-        "label": "rolls_up_to",
-        "display_label": "上卷到",
-        "custom": true
+        "from": "去重商机金额",
+        "to": "总商机金额",
+        "label": "derived_from",
+        "display_label": "衍生依赖"
+      },
+      {
+        "from": "总商机金额",
+        "to": "商机金额",
+        "label": "derived_from",
+        "display_label": "衍生(SUM)"
       },
       {
         "from": "在途商机",
@@ -137,16 +143,11 @@
         "display_label": "被度量"
       },
       {
-        "from": "总商机金额",
-        "to": "商机金额",
-        "label": "derived_from",
-        "display_label": "衍生(SUM)"
-      },
-      {
-        "from": "去重商机金额",
-        "to": "总商机金额",
-        "label": "derived_from",
-        "display_label": "衍生依赖"
+        "from": "子行业",
+        "to": "行业",
+        "label": "rolls_up_to",
+        "display_label": "上卷到",
+        "custom": true
       },
       {
         "from": "客户",
@@ -353,23 +354,30 @@
   "paths": [
     {
       "between": [
-        "行业",
-        "子行业"
+        "去重商机金额",
+        "商机金额"
       ],
       "nodes": [
-        "行业",
-        "子行业"
+        "去重商机金额",
+        "总商机金额",
+        "商机金额"
       ],
       "edges": [
         {
-          "from": "子行业",
-          "to": "行业",
-          "label": "rolls_up_to",
-          "display_label": "上卷到"
+          "from": "去重商机金额",
+          "to": "总商机金额",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        },
+        {
+          "from": "总商机金额",
+          "to": "商机金额",
+          "label": "derived_from",
+          "display_label": "衍生(SUM)"
         }
       ],
       "level": 0,
-      "guided_by_lca": "Attribute簇0"
+      "guided_by_lca": "商机度量指标"
     },
     {
       "between": [
@@ -422,7 +430,7 @@
     {
       "between": [
         "行业",
-        "去重商机金额"
+        "商机金额"
       ],
       "nodes": [
         "行业",
@@ -430,9 +438,7 @@
         "客户",
         "商机",
         "商机创建",
-        "商机金额",
-        "总商机金额",
-        "去重商机金额"
+        "商机金额"
       ],
       "edges": [
         {
@@ -464,79 +470,10 @@
           "to": "商机金额",
           "label": "measured_by",
           "display_label": "被度量"
-        },
-        {
-          "from": "总商机金额",
-          "to": "商机金额",
-          "label": "derived_from",
-          "display_label": "衍生(SUM)"
-        },
-        {
-          "from": "去重商机金额",
-          "to": "总商机金额",
-          "label": "derived_from",
-          "display_label": "衍生依赖"
         }
       ],
       "level": 0,
-      "guided_by_lca": null,
-      "retry_hops": 8
-    },
-    {
-      "between": [
-        "子行业",
-        "去重商机金额"
-      ],
-      "nodes": [
-        "子行业",
-        "客户",
-        "商机",
-        "商机创建",
-        "商机金额",
-        "总商机金额",
-        "去重商机金额"
-      ],
-      "edges": [
-        {
-          "from": "客户",
-          "to": "子行业",
-          "label": "has_attribute",
-          "display_label": "客户属性"
-        },
-        {
-          "from": "客户",
-          "to": "商机",
-          "label": "relates_to",
-          "display_label": "参与"
-        },
-        {
-          "from": "商机",
-          "to": "商机创建",
-          "label": "has_event",
-          "display_label": "经历事件"
-        },
-        {
-          "from": "商机创建",
-          "to": "商机金额",
-          "label": "measured_by",
-          "display_label": "被度量"
-        },
-        {
-          "from": "总商机金额",
-          "to": "商机金额",
-          "label": "derived_from",
-          "display_label": "衍生(SUM)"
-        },
-        {
-          "from": "去重商机金额",
-          "to": "总商机金额",
-          "label": "derived_from",
-          "display_label": "衍生依赖"
-        }
-      ],
-      "level": 0,
-      "guided_by_lca": null,
-      "retry_hops": 8
+      "guided_by_lca": null
     }
   ],
   "isolated": [],
@@ -553,8 +490,28 @@
     },
     {
       "between": [
+        "行业",
+        "去重商机金额"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "dimension_filter",
+      "join_key": "opportunity_id",
+      "display_label": "跨域过滤条件"
+    },
+    {
+      "between": [
         "子行业",
         "总商机金额"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "dimension_filter",
+      "join_key": "opportunity_id",
+      "display_label": "跨域过滤条件"
+    },
+    {
+      "between": [
+        "子行业",
+        "去重商机金额"
       ],
       "sql_clause": "WHERE",
       "condition_type": "dimension_filter",
@@ -622,7 +579,7 @@
       "display_label": "业务口径过滤"
     }
   ],
-  "capability": "\n## 维度-指标分析能力\n  在途商机 [Concept/Filter]:\n   去重商机金额 (可作为过滤条件)\n  子行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n  行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n\n  去重商机金额 可被以下维度/概念分析: 在途商机, 子行业, 行业",
+  "capability": "\n## 维度-指标分析能力\n  在途商机 [Concept/Filter]:\n   去重商机金额 (可作为过滤条件)\n   商机金额 (可作为过滤条件)\n  子行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n  行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n\n  去重商机金额 可被以下维度/概念分析: 在途商机, 子行业, 行业\n  商机金额 可被以下维度/概念分析: 在途商机",
   "hierarchy": {
     "strategy": "lca_guided_v2_no_sql_path",
     "num_levels": 2,
@@ -631,17 +588,26 @@
         "在途商机",
         "去重商机金额",
         "行业",
-        "子行业"
+        "子行业",
+        "商机金额"
       ],
       "1": [
-        "Concept/Filter簇1",
-        "Metric簇9",
-        "Attribute簇0"
+        "商机状态",
+        "商机度量指标",
+        "业务维度"
       ]
     },
     "lca_groups": [
       {
-        "lca": "Attribute簇0",
+        "lca": "商机度量指标",
+        "entities": [
+          "去重商机金额",
+          "商机金额"
+        ],
+        "scope": "pair"
+      },
+      {
+        "lca": "业务维度",
         "entities": [
           "行业",
           "子行业"
@@ -651,6 +617,10 @@
     ],
     "searched_pairs": [
       [
+        "去重商机金额",
+        "商机金额"
+      ],
+      [
         "行业",
         "子行业"
       ],
@@ -659,99 +629,111 @@
         "去重商机金额"
       ],
       [
+        "在途商机",
+        "商机金额"
+      ],
+      [
         "子行业",
         "去重商机金额"
       ],
       [
+        "子行业",
+        "商机金额"
+      ],
+      [
         "行业",
         "去重商机金额"
+      ],
+      [
+        "行业",
+        "商机金额"
       ]
     ],
     "sql_policy": "SQL edges are excluded during path construction and should be merged after subgraph retrieval.",
     "abstract_nodes": [
       {
-        "label": "Attribute簇0",
-        "description": "4个Attribute节点的语义聚合",
+        "label": "业务维度",
+        "description": "用于描述销售与出库业务场景的多维属性，支撑按地域、行业及产品等视角的精细化数据分析。",
         "level": 1,
         "member_count": 4
       },
       {
-        "label": "Concept/Filter簇1",
-        "description": "6个Concept/Filter节点的语义聚合",
+        "label": "商机状态",
+        "description": "描述商机在销售生命周期中所处的不同阶段或结果状态，主要用于业务数据的分类与条件筛选。",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "Concept/Filter簇2",
-        "description": "1个Concept/Filter节点的语义聚合",
+        "label": "规模商机",
+        "description": "指在业务中达到特定规模标准（如出库额超十万）的高价值商业机会或潜在客户群体。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "Entity簇3",
-        "description": "3个Entity节点的语义聚合",
+        "label": "销售业务",
+        "description": "记录企业从商机挖掘、客户管理到产品出库的完整销售链路，反映销售运营与交易履约情况。",
         "level": 1,
         "member_count": 3
       },
       {
-        "label": "Event簇4",
-        "description": "5个Event节点的语义聚合",
+        "label": "商机里程碑",
+        "description": "记录商机从创建、签单、下单到出库等销售生命周期中的关键时间节点与里程碑事件。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Event簇5",
-        "description": "2个Event节点的语义聚合",
+        "label": "投标结果",
+        "description": "表示企业参与招投标活动后最终获得的中标或未中标的状态与事件。",
         "level": 1,
         "member_count": 2
       },
       {
-        "label": "Function簇6",
-        "description": "5个Function节点的语义聚合",
+        "label": "指标计算函数",
+        "description": "在数据分析与指标构建中，用于对数据进行汇总、统计及差额计算的核心函数与逻辑。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Function簇7",
-        "description": "1个Function节点的语义聚合",
+        "label": "聚合函数",
+        "description": "对一组数值进行统计计算并返回单一汇总结果的函数，广泛应用于数据库查询与数据分析。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "Function簇8",
-        "description": "5个Function节点的语义聚合",
+        "label": "分析函数",
+        "description": "用于对基础数据进行二次加工、对比、排序及比例计算的常用数据分析与统计计算函数。",
         "level": 1,
         "member_count": 5
       },
       {
-        "label": "Metric簇9",
-        "description": "6个Metric节点的语义聚合",
+        "label": "商机度量指标",
+        "description": "反映商机规模与数量的核心业务度量指标，包含商机金额与商机数的汇总及去重统计计算。",
         "level": 1,
         "member_count": 6
       },
       {
-        "label": "Metric簇10",
-        "description": "1个Metric节点的语义聚合",
+        "label": "出库金额指标",
+        "description": "概括出库业务中的金额类度量指标，反映交货或出库环节的总财务价值与业务规模。",
         "level": 1,
         "member_count": 1
       },
       {
-        "label": "MetricCategory簇11",
-        "description": "2个MetricCategory节点的语义聚合",
+        "label": "指标分类",
+        "description": "按度量类型对业务指标进行的逻辑分组，用于归类和管理金额、数量等具体指标。",
         "level": 1,
         "member_count": 2
       }
     ],
     "path_dedup_stats": {
-      "original_count": 2,
-      "deduped_count": 4,
-      "reduction_ratio": "-100%"
+      "original_count": 6,
+      "deduped_count": 3,
+      "reduction_ratio": "50%"
     }
   },
   "meta": {
     "total_nodes": 10,
     "total_edges": 28,
-    "total_paths": 4,
+    "total_paths": 3,
     "isolated_count": 0,
     "max_hops": 5
   }

@@ -17,8 +17,8 @@
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
-from index_builder import GraphIndex
-from loader import Edge, Node
+from graph.index_builder import GraphIndex
+from graph.loader import Edge, Node
 
 
 # ── 节点分类 ────────────────────────────────────────────────

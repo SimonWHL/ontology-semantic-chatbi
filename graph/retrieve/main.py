@@ -32,14 +32,17 @@ from typing import Optional
 
 import yaml
 
-from loader import load_graph, SemanticGraph
-from index_builder import build_index, GraphIndex
-from entity_extractor import build_extractor, EntityExtractor
-from subgraph_builder import build_subgraph
-from subgraph_retriever_v2 import build_subgraph as build_subgraph_v2
-from context_formatter import format_context, format_context_md
+from graph.loader import load_graph, SemanticGraph
+from graph.index_builder import build_index, GraphIndex
+from extraction.entity_extractor import build_extractor, EntityExtractor
+from retrieval.subgraph_builder import build_subgraph
+from retrieval.subgraph_retriever_v2 import build_subgraph as build_subgraph_v2
+import re
+
+from output.context_formatter import format_context, format_context_md
 
 BASE_DIR = Path(__file__).resolve().parent
+RESULTS_DIR = BASE_DIR / "results"
 
 
 def _load_config() -> dict:
@@ -77,7 +80,7 @@ def _load(graph_path: str) -> tuple[SemanticGraph, GraphIndex, object, list]:
     graph = load_graph(path, include_sql_edges=False)
     index = build_index(graph)
     # 能力矩阵（含 SQL 边）
-    from metric_capability import build_capability
+    from graph.metric_capability import build_capability
     graph_sql = load_graph(path, include_sql_edges=True)
     capability = build_capability(graph_sql)
     sql_edges = graph_sql.edges
@@ -137,6 +140,27 @@ def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
     return result
 
 
+def _save_results(question: str, context: dict) -> None:
+    """自动保存 JSON + HTML 到 results/ 目录。"""
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    safe = re.sub(r'[\\/*?:"<>|\s]+', '_', question.strip())
+    if len(safe) > 40:
+        safe = safe[:40]
+    safe = safe.strip("_")
+
+    json_path = RESULTS_DIR / f"{safe}.json"
+    html_path = RESULTS_DIR / f"{safe}.html"
+
+    json_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    try:
+        from output.html_visualizer import _generate_html
+        _generate_html(question, context["subgraph"], html_path)
+        print(f"💾 {json_path.name}  |  🌐 {html_path.name}", file=sys.stderr)
+    except Exception as e:
+        print(f"💾 {json_path.name}  (HTML 生成失败: {e})", file=sys.stderr)
+
+
 def query(
     question: str,
     index: GraphIndex,
@@ -180,9 +204,21 @@ def query(
         emb_dim_results = extractor.extract_by_embedding(question, top_k_attr=2, top_k_safe=3)
 
         if use_llm and emb_candidates:
-            llm_filtered = extractor.extract_by_llm_filter(question, emb_candidates)
-            llm_filtered = extractor._filter_concept_by_question(llm_filtered, question)
-            llm_filtered = extractor._filter_derived_metrics(llm_filtered, question)
+            try:
+                from extraction.entity_extractor import LLMError
+                llm_filtered = extractor.extract_by_llm_filter(question, emb_candidates)
+                llm_filtered = extractor._filter_concept_by_question(llm_filtered, question)
+                llm_filtered = extractor._filter_derived_metrics(llm_filtered, question)
+            except LLMError as e:
+                print(f"  [LLM] ❌ 精筛失败: {e}")
+                if e.status_code:
+                    if e.status_code == 403:
+                        print(f"  [LLM] → 403 权限不足，请检查 API key 是否有效或额度是否耗尽")
+                    elif e.status_code == 429:
+                        print(f"  [LLM] → 429 请求过多，请稍后重试")
+                    elif e.status_code >= 500:
+                        print(f"  [LLM] → 服务端错误，请检查 API 地址是否可用")
+                llm_filtered = []
 
     # 合成最终 entities
     entities = list(rule_entities)
@@ -343,12 +379,9 @@ def main():
             verbose=True,
         )
 
-        if args.output:
-            output = json.dumps(result, ensure_ascii=False, indent=2)
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(output)
-            print(f"已输出到: {args.output}", file=sys.stderr)
-        elif args.md:
+        # 自动保存 JSON + HTML
+        _save_results(args.question, result)
+        if args.md:
             entities = result["entities"]
             subgraph_raw = {
                 "nodes": [index.graph.node_map[n["label"]] for n in result["subgraph"]["nodes"] if n["label"] in index.graph.node_map],
@@ -357,6 +390,11 @@ def main():
                 "isolated": result["isolated"],
             }
             print(format_context_md(args.question, entities, subgraph_raw))
+        if args.output:
+            output = json.dumps(result, ensure_ascii=False, indent=2)
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(output)
+            print(f"已输出到: {args.output}", file=sys.stderr)
     else:
         # 交互模式
         print("\n知识图谱检索系统 v2.0", file=sys.stderr)
@@ -386,11 +424,9 @@ def main():
                 verbose=True,
             )
 
-            if args.output:
-                output = json.dumps(result, ensure_ascii=False, indent=2)
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(output)
-            elif args.md:
+            # 自动保存 JSON + HTML
+            _save_results(line, result)
+            if args.md:
                 entities = result["entities"]
                 subgraph_raw = {
                     "nodes": [index.graph.node_map[n["label"]] for n in result["subgraph"]["nodes"] if n["label"] in index.graph.node_map],

@@ -9,10 +9,10 @@
 import sys
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from embedding_store import build_cache
+from extraction.embedding_store import build_cache
 
 GRAPH_PATH = BASE_DIR / "../data/商机.json"
 CACHE_PATH = BASE_DIR / "embeddings.pkl"

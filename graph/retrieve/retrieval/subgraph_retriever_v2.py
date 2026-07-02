@@ -20,22 +20,22 @@ from collections import deque
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from index_builder import GraphIndex
-from loader import Edge, Node
+from graph.index_builder import GraphIndex
+from graph.loader import Edge, Node
 
-from hierarchical_aggregator import (
+from retrieval.hierarchical_aggregator import (
     HierarchicalGraph,
     build_hierarchical_graph,
     build_hierarchical_subgraph,
 )
-from subgraph_builder import (
+from retrieval.subgraph_builder import (
     _LOW_PRIORITY_BRIDGE_LABELS,
     _LOW_PRIORITY_BRIDGE_PENALTY,
     _is_low_priority_metric_shortcut,
     _path_has_low_priority_metric_shortcut,
 )
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ══════════════════════════════════════════════════════════════
 # 分层图谱缓存

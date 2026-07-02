@@ -35,8 +35,8 @@ def build_cache(
     6. pickle 序列化写入磁盘
     """
     from sentence_transformers import SentenceTransformer
-    from loader import load_graph
-    from entity_extractor import ALIAS_MAP, RULE_SAFE_TYPES
+    from graph.loader import load_graph
+    from extraction.entity_extractor import ALIAS_MAP, RULE_SAFE_TYPES
 
     print(f"📂 加载图谱: {graph_path}")
     graph = load_graph(graph_path, include_sql_edges=True)

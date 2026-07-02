@@ -12,15 +12,14 @@ import yaml
 BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
-from loader import load_graph, Edge
-from index_builder import build_index
-from entity_extractor import build_extractor
-from subgraph_builder import build_subgraph
-from subgraph_retriever_v2 import build_subgraph as build_subgraph_v2
-from context_formatter import format_context
+from graph.loader import load_graph, Edge
+from graph.index_builder import build_index
+from extraction.entity_extractor import build_extractor
+from retrieval.subgraph_builder import build_subgraph
+from retrieval.subgraph_retriever_v2 import build_subgraph as build_subgraph_v2
+from output.context_formatter import format_context
 
-# ── 复用 test_interactive.py 的 HTML 模板 ──
-from test_interactive import _generate_html, format_paths_text
+from output.html_visualizer import _generate_html
 
 
 def _load_config() -> dict:
