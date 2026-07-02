@@ -211,8 +211,8 @@ def query(
         print(f"[Phase 1] 实体抽取")
         print(f"  L1 规则匹配: {rule_entities if rule_entities else '(无命中)'}")
         if use_embedding:
-            print(f"  L2 Embedding候选: {emb_candidates if emb_candidates else '(无命中 - 模型可能加载失败)'}")
-            print(f"  L2 Embedding维度: {emb_dim_results if emb_dim_results else '(无命中)'}")
+            print(f"  L2a Embedding别名召回: {emb_candidates if emb_candidates else '(无命中 - 模型可能加载失败)'}")
+            print(f"  L2b Embedding-label召回: {emb_dim_results if emb_dim_results else '(无命中)'}")
         else:
             print(f"  L2 Embedding: (未启用)")
         if use_llm:
