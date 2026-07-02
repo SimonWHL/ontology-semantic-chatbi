@@ -1457,54 +1457,83 @@ def build_hierarchical_subgraph(
                     collected_edges[key] = edge
                     break
 
-    nodes_in_paths: Set[str] = set()
-    for pth in deduped_paths:
-        nodes_in_paths.update(n for n in pth.get("nodes", []) if n in node_map)
+    def _collect_edge_objects_from_path(path: dict) -> None:
+        for ei in path.get("edges", []):
+            key = (ei["from"], ei["to"], ei.get("label", ""))
+            if key in collected_edges:
+                continue
+            for edge in g0_graph.edges:
+                if edge.sql_edge:
+                    continue
+                if (edge.from_label == ei["from"]
+                        and edge.to_label == ei["to"]
+                        and edge.label == ei.get("label")):
+                    collected_edges[key] = edge
+                    break
+
+    def _refresh_nodes_in_paths() -> Set[str]:
+        result: Set[str] = set()
+        for pth in deduped_paths:
+            result.update(n for n in pth.get("nodes", []) if n in node_map)
+        return result
+
+    def _entity_connected_to_metric(entity: str) -> bool:
+        if not metric_nodes:
+            return entity in _refresh_nodes_in_paths()
+        for pth in deduped_paths:
+            nodes = set(pth.get("nodes", []))
+            if entity in nodes and any(m in nodes for m in metric_nodes):
+                return True
+        return False
+
+    nodes_in_paths: Set[str] = _refresh_nodes_in_paths()
     isolated = [e for e in valid_entities if e not in nodes_in_paths]
 
-    # 对孤立节点扩大跳数重试，确保子图连通
-    if isolated and max_hops < 10:
-        retry_hops = max_hops + 3
-        for iso in list(isolated):
-            targets = metric_nodes if metric_nodes else [n for n in nodes_in_paths if n != iso]
+    # 对未连接到指标的实体扩大跳数重试，避免维度节点只和其他维度成分量而未接入主子图。
+    # SQL 边仍然不参与搜索；这里只在纯语义边上提高搜索半径。
+    disconnected_entities = [
+        e for e in valid_entities
+        if not _entity_connected_to_metric(e)
+    ]
+    retry_entities = list(dict.fromkeys(isolated + disconnected_entities))
+
+    if retry_entities and max_hops < 10:
+        retry_hops = min(10, max_hops + 3)
+        for entity in retry_entities:
+            targets = metric_nodes if metric_nodes else [n for n in nodes_in_paths if n != entity]
             found = False
             for target in targets:
-                if target == iso:
+                if target == entity:
                     continue
                 paths = _bfs_v1(
-                    semantic_index, iso, target,
+                    semantic_index, entity, target,
                     max_hops=retry_hops,
                     max_paths=1,
                     include_sql_edges=False,
                 )
-                if paths:
-                    for pth in paths:
-                        new_path = {
-                            "between": [iso, target],
-                            "nodes": pth["nodes"],
-                            "edges": pth["edges"],
-                            "level": 0,
-                            "guided_by_lca": None,
-                        }
-                        deduped_paths.append(new_path)
-                        for nl in pth["nodes"]:
-                            if nl in node_map:
-                                collected_nodes.add(nl)
-                        for ei in pth["edges"]:
-                            key = (ei["from"], ei["to"], ei.get("label", ""))
-                            if key not in collected_edges:
-                                for edge in g0_graph.edges:
-                                    if edge.sql_edge:
-                                        continue
-                                    if (edge.from_label == ei["from"]
-                                            and edge.to_label == ei["to"]
-                                            and edge.label == ei.get("label")):
-                                        collected_edges[key] = edge
-                                        break
-                    found = True
-                    break
-            if found:
-                isolated.remove(iso)
+                if not paths:
+                    continue
+                for pth in paths:
+                    new_path = {
+                        "between": [entity, target],
+                        "nodes": pth["nodes"],
+                        "edges": pth["edges"],
+                        "level": 0,
+                        "guided_by_lca": _find_lca_for_entities([entity, target], hg),
+                        "retry_hops": retry_hops,
+                    }
+                    deduped_paths.append(new_path)
+                    for nl in pth["nodes"]:
+                        if nl in node_map:
+                            collected_nodes.add(nl)
+                    _collect_edge_objects_from_path(pth)
+                found = True
+                break
+            if found and entity in isolated:
+                isolated.remove(entity)
+
+    nodes_in_paths = _refresh_nodes_in_paths()
+    isolated = [e for e in valid_entities if e not in nodes_in_paths]
 
     return {
         "nodes": [node_map[n] for n in collected_nodes if n in node_map],
