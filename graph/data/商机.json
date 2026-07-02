@@ -2259,6 +2259,12 @@
       "to": "客户",
       "label": "relates_to",
       "display_label": "出库客户"
+    },
+    {
+      "from": "行业",
+      "to": "客户",
+      "label": "relates_to",
+      "display_label": "行业归属"
     }
   ]
 }
