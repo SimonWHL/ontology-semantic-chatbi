@@ -30,4 +30,4 @@ v2:
 deepseek:
   api_key: "sk-0735d9cf32b84ac094b73ce2f7333324"
   base_url: "https://llm-inef49c26ow2qwjx.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"
-  model: "qwen3.6-plus-2026-04-02"
+  model: "qwen3.7-max-2026-05-17"

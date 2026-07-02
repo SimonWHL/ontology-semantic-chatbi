@@ -6,70 +6,17 @@
     "出库金额",
     "城市",
     "商机",
+    "去重商机数",
     "出库明细",
     "占比"
   ],
   "subgraph": {
     "nodes": [
       {
-        "label": "首次出库",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "第一次出库日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_first_outbound_date",
-        "column": "first_outbound_date",
-        "data_type": "datetime"
-      },
-      {
-        "label": "占比",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "占总体比例",
-        "category": "对比分析"
-      },
-      {
-        "label": "城市",
-        "type": "Attribute",
+        "label": "数量指标",
+        "type": "MetricCategory",
         "color": "#60a5fa",
-        "description": "业绩地市",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_performance_city",
-        "column": "performance_city"
-      },
-      {
-        "label": "商机数",
-        "type": "Metric",
-        "color": "#fb6060",
-        "description": "商机总数，按商机编号去重计数",
-        "cube": "cube_kpi_opportunity",
-        "metric": "metric_outbound_opportunity_count",
-        "metric_type": "simple",
-        "agg": "COUNT_DISTINCT",
-        "expr": "ZZOPPID"
-      },
-      {
-        "label": "出库明细",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
-        "cube": "cube_gn_sales_deliver_detail",
-        "dataset": "ads_gn_sales_deliver_detail",
-        "foreign_entity": "opportunity_id"
-      },
-      {
-        "label": "求和",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "SUM",
-        "category": "基础聚合"
-      },
-      {
-        "label": "计数",
-        "type": "Function",
-        "color": "#ca60fb",
-        "description": "COUNT / COUNT_DISTINCT",
-        "category": "基础聚合"
+        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
       },
       {
         "label": "商机",
@@ -87,19 +34,15 @@
         "description": "金额类指标的逻辑分组（商机金额、总商机金额、去重商机金额、出库金额）"
       },
       {
-        "label": "数量指标",
-        "type": "MetricCategory",
-        "color": "#60a5fa",
-        "description": "数量类指标的逻辑分组（商机数、去重商机数、重复商机数）"
-      },
-      {
-        "label": "规上商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "出库额10万以上的规上商机",
-        "expr": "metric_outbound_amount_sum_alias >= 10",
-        "filter": "filter_opportunity_scale_above_10w",
-        "filter_type": "Metric"
+        "label": "去重商机数",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "去重后的商机数，语义层暂无对应 metric 文件，建议补充",
+        "depends_on": [
+          "metric_outbound_opportunity_count",
+          "metric_duplicate_opportunity_count"
+        ],
+        "warning": "语义层缺少对应 metric 定义"
       },
       {
         "label": "出库金额",
@@ -111,6 +54,75 @@
         "metric_type": "simple",
         "agg": "SUM",
         "expr": "ZJHZJ_JT"
+      },
+      {
+        "label": "规上商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "出库额10万以上的规上商机",
+        "expr": "metric_outbound_amount_sum_alias >= 10",
+        "filter": "filter_opportunity_scale_above_10w",
+        "filter_type": "Metric"
+      },
+      {
+        "label": "首次出库",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "第一次出库日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_first_outbound_date",
+        "column": "first_outbound_date",
+        "data_type": "datetime"
+      },
+      {
+        "label": "城市",
+        "type": "Attribute",
+        "color": "#60a5fa",
+        "description": "业绩地市",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_performance_city",
+        "column": "performance_city"
+      },
+      {
+        "label": "占比",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "占总体比例",
+        "category": "对比分析"
+      },
+      {
+        "label": "计数",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "COUNT / COUNT_DISTINCT",
+        "category": "基础聚合"
+      },
+      {
+        "label": "求和",
+        "type": "Function",
+        "color": "#ca60fb",
+        "description": "SUM",
+        "category": "基础聚合"
+      },
+      {
+        "label": "出库明细",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "近六年_日出库明细（无参数）_客户_GN分析立方体",
+        "cube": "cube_gn_sales_deliver_detail",
+        "dataset": "ads_gn_sales_deliver_detail",
+        "foreign_entity": "opportunity_id"
+      },
+      {
+        "label": "商机数",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "商机总数，按商机编号去重计数",
+        "cube": "cube_kpi_opportunity",
+        "metric": "metric_outbound_opportunity_count",
+        "metric_type": "simple",
+        "agg": "COUNT_DISTINCT",
+        "expr": "ZZOPPID"
       }
     ],
     "edges": [
@@ -154,25 +166,25 @@
         "display_label": "COUNT_DISTINCT"
       },
       {
-        "from": "商机",
-        "to": "首次出库",
-        "label": "has_event",
-        "display_label": "经历事件"
+        "from": "去重商机数",
+        "to": "商机数",
+        "label": "derived_from",
+        "display_label": "衍生依赖"
       },
       {
-        "from": "首次出库",
+        "from": "规上商机",
         "to": "出库金额",
-        "label": "measured_by",
-        "display_label": "被度量"
+        "label": "constrains",
+        "display_label": ">=10万"
       },
       {
-        "from": "商机",
-        "to": "城市",
-        "label": "has_attribute",
-        "display_label": "位于"
+        "from": "规上商机",
+        "to": "商机",
+        "label": "constrains",
+        "display_label": "口径约束"
       },
       {
-        "from": "商机数",
+        "from": "去重商机数",
         "to": "数量指标",
         "label": "classified_as",
         "display_label": "属于",
@@ -199,16 +211,29 @@
         "display_label": "对比分析"
       },
       {
-        "from": "规上商机",
-        "to": "出库金额",
-        "label": "constrains",
-        "display_label": ">=10万"
+        "from": "商机",
+        "to": "首次出库",
+        "label": "has_event",
+        "display_label": "经历事件"
       },
       {
-        "from": "规上商机",
-        "to": "商机",
-        "label": "constrains",
-        "display_label": "口径约束"
+        "from": "首次出库",
+        "to": "出库金额",
+        "label": "measured_by",
+        "display_label": "被度量"
+      },
+      {
+        "from": "商机",
+        "to": "城市",
+        "label": "has_attribute",
+        "display_label": "位于"
+      },
+      {
+        "from": "商机数",
+        "to": "数量指标",
+        "label": "classified_as",
+        "display_label": "属于",
+        "custom": true
       },
       {
         "from": "城市",
@@ -276,6 +301,16 @@
       },
       {
         "from": "规上商机",
+        "to": "去重商机数",
+        "label": "having",
+        "display_label": "聚合后过滤",
+        "sql_edge": true,
+        "sql_clause": "HAVING",
+        "condition_type": "metric_filter",
+        "expr": "metric_outbound_amount_sum_alias >= 10"
+      },
+      {
+        "from": "规上商机",
         "to": "出库金额",
         "label": "having",
         "display_label": "聚合后过滤",
@@ -330,15 +365,23 @@
     },
     {
       "between": [
-        "出库明细",
-        "商机数"
+        "出库金额",
+        "去重商机数"
       ],
       "nodes": [
+        "出库金额",
         "出库明细",
         "商机",
-        "商机数"
+        "商机数",
+        "去重商机数"
       ],
       "edges": [
+        {
+          "from": "出库明细",
+          "to": "出库金额",
+          "label": "measured_by",
+          "display_label": "被度量"
+        },
         {
           "from": "商机",
           "to": "出库明细",
@@ -350,6 +393,121 @@
           "to": "商机数",
           "label": "measured_by",
           "display_label": "COUNT_DISTINCT"
+        },
+        {
+          "from": "去重商机数",
+          "to": "商机数",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "出库金额",
+        "去重商机数"
+      ],
+      "nodes": [
+        "出库金额",
+        "规上商机",
+        "商机",
+        "商机数",
+        "去重商机数"
+      ],
+      "edges": [
+        {
+          "from": "规上商机",
+          "to": "出库金额",
+          "label": "constrains",
+          "display_label": ">=10万"
+        },
+        {
+          "from": "规上商机",
+          "to": "商机",
+          "label": "constrains",
+          "display_label": "口径约束"
+        },
+        {
+          "from": "商机",
+          "to": "商机数",
+          "label": "measured_by",
+          "display_label": "COUNT_DISTINCT"
+        },
+        {
+          "from": "去重商机数",
+          "to": "商机数",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "去重商机数",
+        "占比"
+      ],
+      "nodes": [
+        "去重商机数",
+        "数量指标",
+        "求和",
+        "占比"
+      ],
+      "edges": [
+        {
+          "from": "去重商机数",
+          "to": "数量指标",
+          "label": "classified_as",
+          "display_label": "属于"
+        },
+        {
+          "from": "数量指标",
+          "to": "求和",
+          "label": "supports_function",
+          "display_label": "可计算"
+        },
+        {
+          "from": "求和",
+          "to": "占比",
+          "label": "derived_from",
+          "display_label": "对比分析"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "去重商机数",
+        "占比"
+      ],
+      "nodes": [
+        "去重商机数",
+        "数量指标",
+        "计数",
+        "占比"
+      ],
+      "edges": [
+        {
+          "from": "去重商机数",
+          "to": "数量指标",
+          "label": "classified_as",
+          "display_label": "属于"
+        },
+        {
+          "from": "数量指标",
+          "to": "计数",
+          "label": "supports_function",
+          "display_label": "可计算"
+        },
+        {
+          "from": "计数",
+          "to": "占比",
+          "label": "derived_from",
+          "display_label": "对比分析"
         }
       ],
       "level": 0,
@@ -589,6 +747,40 @@
     },
     {
       "between": [
+        "城市",
+        "去重商机数"
+      ],
+      "nodes": [
+        "城市",
+        "商机",
+        "商机数",
+        "去重商机数"
+      ],
+      "edges": [
+        {
+          "from": "商机",
+          "to": "城市",
+          "label": "has_attribute",
+          "display_label": "位于"
+        },
+        {
+          "from": "商机",
+          "to": "商机数",
+          "label": "measured_by",
+          "display_label": "COUNT_DISTINCT"
+        },
+        {
+          "from": "去重商机数",
+          "to": "商机数",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
         "规上商机",
         "占比"
       ],
@@ -627,37 +819,62 @@
       ],
       "level": 0,
       "guided_by_lca": null
+    }
+  ],
+  "isolated": [],
+  "sql_analysis_paths": [
+    {
+      "between": [
+        "城市",
+        "商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "dimension_filter",
+      "join_key": "",
+      "display_label": "作为过滤条件"
     },
     {
       "between": [
         "规上商机",
         "商机数"
       ],
-      "nodes": [
-        "规上商机",
-        "商机",
+      "sql_clause": "HAVING",
+      "condition_type": "metric_filter",
+      "join_key": "",
+      "display_label": "聚合后过滤"
+    },
+    {
+      "between": [
+        "首次出库",
         "商机数"
       ],
-      "edges": [
-        {
-          "from": "规上商机",
-          "to": "商机",
-          "label": "constrains",
-          "display_label": "口径约束"
-        },
-        {
-          "from": "商机",
-          "to": "商机数",
-          "label": "measured_by",
-          "display_label": "COUNT_DISTINCT"
-        }
+      "sql_clause": "WHERE",
+      "condition_type": "time_filter",
+      "join_key": "",
+      "display_label": "时间过滤"
+    },
+    {
+      "between": [
+        "规上商机",
+        "去重商机数"
       ],
-      "level": 0,
-      "guided_by_lca": null
+      "sql_clause": "HAVING",
+      "condition_type": "metric_filter",
+      "join_key": "",
+      "display_label": "聚合后过滤"
+    },
+    {
+      "between": [
+        "规上商机",
+        "出库金额"
+      ],
+      "sql_clause": "HAVING",
+      "condition_type": "metric_filter",
+      "join_key": "",
+      "display_label": "聚合后过滤"
     }
   ],
-  "isolated": [],
-  "capability": "\n## 维度-指标分析能力\n  城市 [Attribute]:\n   出库金额 (可作为分组维度、可作为过滤条件)\n   商机数 (可作为分组维度、可作为过滤条件)\n  规上商机 [Concept/Filter]:\n   出库金额 (可作为聚合后条件)\n   商机数 (可作为聚合后条件)\n\n  出库金额 可被以下维度/概念分析: 城市, 规上商机\n  商机数 可被以下维度/概念分析: 城市, 规上商机",
+  "capability": "\n## 维度-指标分析能力\n  城市 [Attribute]:\n   出库金额 (可作为分组维度、可作为过滤条件)\n   商机数 (可作为分组维度、可作为过滤条件)\n  规上商机 [Concept/Filter]:\n   出库金额 (可作为聚合后条件)\n   去重商机数 (可作为聚合后条件)\n   商机数 (可作为聚合后条件)\n\n  出库金额 可被以下维度/概念分析: 城市, 规上商机\n  去重商机数 可被以下维度/概念分析: 规上商机\n  商机数 可被以下维度/概念分析: 城市, 规上商机",
   "hierarchy": {
     "strategy": "lca_guided_v2_no_sql_path",
     "num_levels": 2,
@@ -668,6 +885,7 @@
         "出库金额",
         "城市",
         "商机",
+        "去重商机数",
         "出库明细",
         "占比"
       ],
@@ -681,6 +899,14 @@
       ]
     },
     "lca_groups": [
+      {
+        "lca": "Metric簇9",
+        "entities": [
+          "商机数",
+          "去重商机数"
+        ],
+        "scope": "pair"
+      },
       {
         "lca": "Entity簇3",
         "entities": [
@@ -696,12 +922,20 @@
         "出库明细"
       ],
       [
+        "商机数",
+        "去重商机数"
+      ],
+      [
         "出库明细",
         "出库金额"
       ],
       [
         "出库明细",
         "占比"
+      ],
+      [
+        "出库明细",
+        "去重商机数"
       ],
       [
         "出库明细",
@@ -712,12 +946,24 @@
         "占比"
       ],
       [
+        "出库金额",
+        "去重商机数"
+      ],
+      [
+        "去重商机数",
+        "占比"
+      ],
+      [
         "商机",
         "出库金额"
       ],
       [
         "商机",
         "占比"
+      ],
+      [
+        "商机",
+        "去重商机数"
       ],
       [
         "商机",
@@ -741,6 +987,10 @@
       ],
       [
         "城市",
+        "去重商机数"
+      ],
+      [
+        "城市",
         "商机数"
       ],
       [
@@ -750,6 +1000,10 @@
       [
         "规上商机",
         "占比"
+      ],
+      [
+        "规上商机",
+        "去重商机数"
       ],
       [
         "规上商机",
@@ -832,15 +1086,15 @@
       }
     ],
     "path_dedup_stats": {
-      "original_count": 22,
-      "deduped_count": 10,
-      "reduction_ratio": "54%"
+      "original_count": 31,
+      "deduped_count": 13,
+      "reduction_ratio": "58%"
     }
   },
   "meta": {
-    "total_nodes": 12,
-    "total_edges": 23,
-    "total_paths": 10,
+    "total_nodes": 13,
+    "total_edges": 26,
+    "total_paths": 13,
     "isolated_count": 0,
     "max_hops": 5
   }

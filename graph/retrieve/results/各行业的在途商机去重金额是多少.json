@@ -4,49 +4,21 @@
     "在途商机",
     "去重商机金额",
     "行业",
-    "子行业"
+    "子行业",
+    "商机"
   ],
   "subgraph": {
     "nodes": [
       {
-        "label": "总商机金额",
+        "label": "商机数",
         "type": "Metric",
         "color": "#fb6060",
-        "description": "未去重的商机总金额（measure label 为商机总金额）",
+        "description": "商机总数，按商机编号去重计数",
         "cube": "cube_kpi_opportunity",
-        "metric": "metric_opportunity_amount_sum_duplicate",
+        "metric": "metric_outbound_opportunity_count",
         "metric_type": "simple",
-        "agg": "SUM",
-        "expr": "ZZOPTYAMT"
-      },
-      {
-        "label": "商机",
-        "type": "Entity",
-        "color": "#60a5fa",
-        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
-        "cube": "cube_kpi_opportunity",
-        "dataset": "ads_kpi_opportunity",
-        "primary_entity": "opportunity_id"
-      },
-      {
-        "label": "商机创建",
-        "type": "Event",
-        "color": "#f8fb60",
-        "description": "商机创建日期",
-        "cube": "cube_kpi_opportunity",
-        "dimension": "dim_create_time",
-        "column": "create_time",
-        "data_type": "datetime"
-      },
-      {
-        "label": "在途商机",
-        "type": "Concept/Filter",
-        "color": "#7afb60",
-        "description": "关、输、赢之外的都是在途商机",
-        "dimension": "cube_kpi_opportunity.dim_opportunity_status",
-        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')",
-        "filter": "filter_in_progress_opportunity",
-        "filter_type": "Dimension"
+        "agg": "COUNT_DISTINCT",
+        "expr": "ZZOPPID"
       },
       {
         "label": "预计签单",
@@ -59,13 +31,23 @@
         "data_type": "datetime"
       },
       {
-        "label": "客户",
-        "type": "Entity",
+        "label": "子行业",
+        "type": "Attribute",
         "color": "#60a5fa",
-        "description": "客户销售信息，客户数量按 SOLD_TO_T 去重计数",
+        "description": "最终用户-子行业描述（来自出库明细域）",
         "cube": "cube_gn_sales_deliver_detail",
-        "dimension": "dim_sales_employee",
-        "column": "sales_employee_code"
+        "dimension": "dim_end_user_sub_industry",
+        "column": "end_user_sub_industry"
+      },
+      {
+        "label": "商机创建",
+        "type": "Event",
+        "color": "#f8fb60",
+        "description": "商机创建日期",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "dim_create_time",
+        "column": "create_time",
+        "data_type": "datetime"
       },
       {
         "label": "行业",
@@ -77,13 +59,45 @@
         "column": "end_user_industry"
       },
       {
-        "label": "子行业",
-        "type": "Attribute",
+        "label": "总商机金额",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "未去重的商机总金额（measure label 为商机总金额）",
+        "cube": "cube_kpi_opportunity",
+        "metric": "metric_opportunity_amount_sum_duplicate",
+        "metric_type": "simple",
+        "agg": "SUM",
+        "expr": "ZZOPTYAMT"
+      },
+      {
+        "label": "重复商机数",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "重复商机数，用于商机金额去重",
+        "cube": "cube_kpi_opportunity",
+        "dimension": "duplicate_opportunity_status",
+        "metric": "metric_duplicate_opportunity_count",
+        "metric_type": "simple",
+        "agg": "COUNT_DISTINCT",
+        "expr": "ZZCFSJZT"
+      },
+      {
+        "label": "客户",
+        "type": "Entity",
         "color": "#60a5fa",
-        "description": "最终用户-子行业描述（来自出库明细域）",
+        "description": "客户销售信息，客户数量按 SOLD_TO_T 去重计数",
         "cube": "cube_gn_sales_deliver_detail",
-        "dimension": "dim_end_user_sub_industry",
-        "column": "end_user_sub_industry"
+        "dimension": "dim_sales_employee",
+        "column": "sales_employee_code"
+      },
+      {
+        "label": "商机",
+        "type": "Entity",
+        "color": "#60a5fa",
+        "description": "历年至今_商机明细（未绑参数）_报备城市维度",
+        "cube": "cube_kpi_opportunity",
+        "dataset": "ads_kpi_opportunity",
+        "primary_entity": "opportunity_id"
       },
       {
         "label": "商机金额",
@@ -97,6 +111,16 @@
         "unit": "万元"
       },
       {
+        "label": "在途商机",
+        "type": "Concept/Filter",
+        "color": "#7afb60",
+        "description": "关、输、赢之外的都是在途商机",
+        "dimension": "cube_kpi_opportunity.dim_opportunity_status",
+        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')",
+        "filter": "filter_in_progress_opportunity",
+        "filter_type": "Dimension"
+      },
+      {
         "label": "去重商机金额",
         "type": "Metric",
         "color": "#fb6060",
@@ -108,6 +132,17 @@
           "metric_opportunity_amount_sum_duplicate",
           "metric_duplicate_opportunity_count"
         ]
+      },
+      {
+        "label": "去重商机数",
+        "type": "Metric",
+        "color": "#fb6060",
+        "description": "去重后的商机数，语义层暂无对应 metric 文件，建议补充",
+        "depends_on": [
+          "metric_outbound_opportunity_count",
+          "metric_duplicate_opportunity_count"
+        ],
+        "warning": "语义层缺少对应 metric 定义"
       }
     ],
     "edges": [
@@ -119,16 +154,10 @@
         "custom": true
       },
       {
-        "from": "在途商机",
-        "to": "预计签单",
-        "label": "constrains",
-        "display_label": "预签口径"
-      },
-      {
-        "from": "商机创建",
-        "to": "预计签单",
-        "label": "state_transition",
-        "display_label": "事件流转"
+        "from": "商机",
+        "to": "商机创建",
+        "label": "has_event",
+        "display_label": "经历事件"
       },
       {
         "from": "商机创建",
@@ -149,6 +178,42 @@
         "display_label": "衍生依赖"
       },
       {
+        "from": "商机",
+        "to": "商机数",
+        "label": "measured_by",
+        "display_label": "COUNT_DISTINCT"
+      },
+      {
+        "from": "去重商机数",
+        "to": "商机数",
+        "label": "derived_from",
+        "display_label": "衍生依赖"
+      },
+      {
+        "from": "去重商机数",
+        "to": "重复商机数",
+        "label": "derived_from",
+        "display_label": "衍生依赖"
+      },
+      {
+        "from": "去重商机金额",
+        "to": "重复商机数",
+        "label": "derived_from",
+        "display_label": "总额/重复数"
+      },
+      {
+        "from": "在途商机",
+        "to": "预计签单",
+        "label": "constrains",
+        "display_label": "预签口径"
+      },
+      {
+        "from": "商机创建",
+        "to": "预计签单",
+        "label": "state_transition",
+        "display_label": "事件流转"
+      },
+      {
         "from": "客户",
         "to": "子行业",
         "label": "has_attribute",
@@ -161,10 +226,44 @@
         "display_label": "参与"
       },
       {
-        "from": "商机",
-        "to": "商机创建",
-        "label": "has_event",
-        "display_label": "经历事件"
+        "from": "行业",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "跨域过滤条件",
+        "join_key": "opportunity_id",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "dimension_filter"
+      },
+      {
+        "from": "行业",
+        "to": "商机数",
+        "label": "group_by",
+        "display_label": "跨域分组维度",
+        "join_key": "opportunity_id",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "dimension_group"
+      },
+      {
+        "from": "子行业",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "跨域过滤条件",
+        "join_key": "opportunity_id",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "dimension_filter"
+      },
+      {
+        "from": "子行业",
+        "to": "商机数",
+        "label": "group_by",
+        "display_label": "跨域分组维度",
+        "join_key": "opportunity_id",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "dimension_group"
       },
       {
         "from": "行业",
@@ -248,6 +347,16 @@
       },
       {
         "from": "在途商机",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "业务口径过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "concept_filter",
+        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')"
+      },
+      {
+        "from": "在途商机",
         "to": "总商机金额",
         "label": "where",
         "display_label": "业务口径过滤",
@@ -265,6 +374,24 @@
         "sql_clause": "WHERE",
         "condition_type": "concept_filter",
         "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')"
+      },
+      {
+        "from": "商机创建",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "时间过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "time_filter"
+      },
+      {
+        "from": "商机创建",
+        "to": "商机数",
+        "label": "group_by",
+        "display_label": "时间分组",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "time_group"
       },
       {
         "from": "商机创建",
@@ -278,6 +405,24 @@
       {
         "from": "商机创建",
         "to": "总商机金额",
+        "label": "group_by",
+        "display_label": "时间分组",
+        "sql_edge": true,
+        "sql_clause": "GROUP BY",
+        "condition_type": "time_group"
+      },
+      {
+        "from": "预计签单",
+        "to": "商机数",
+        "label": "where",
+        "display_label": "时间过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "time_filter"
+      },
+      {
+        "from": "预计签单",
+        "to": "商机数",
         "label": "group_by",
         "display_label": "时间分组",
         "sql_edge": true,
@@ -341,6 +486,26 @@
       {
         "from": "在途商机",
         "to": "商机金额",
+        "label": "where",
+        "display_label": "业务口径过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "concept_filter",
+        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')"
+      },
+      {
+        "from": "在途商机",
+        "to": "重复商机数",
+        "label": "where",
+        "display_label": "业务口径过滤",
+        "sql_edge": true,
+        "sql_clause": "WHERE",
+        "condition_type": "concept_filter",
+        "expr": "opportunity_status not in ('赢单（合同签订）', '赢单（执行订单）', '输单', '关闭')"
+      },
+      {
+        "from": "在途商机",
+        "to": "去重商机数",
         "label": "where",
         "display_label": "业务口径过滤",
         "sql_edge": true,
@@ -370,6 +535,88 @@
       ],
       "level": 0,
       "guided_by_lca": "Attribute簇0"
+    },
+    {
+      "between": [
+        "商机",
+        "去重商机金额"
+      ],
+      "nodes": [
+        "商机",
+        "商机创建",
+        "商机金额",
+        "总商机金额",
+        "去重商机金额"
+      ],
+      "edges": [
+        {
+          "from": "商机",
+          "to": "商机创建",
+          "label": "has_event",
+          "display_label": "经历事件"
+        },
+        {
+          "from": "商机创建",
+          "to": "商机金额",
+          "label": "measured_by",
+          "display_label": "被度量"
+        },
+        {
+          "from": "总商机金额",
+          "to": "商机金额",
+          "label": "derived_from",
+          "display_label": "衍生(SUM)"
+        },
+        {
+          "from": "去重商机金额",
+          "to": "总商机金额",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
+    },
+    {
+      "between": [
+        "商机",
+        "去重商机金额"
+      ],
+      "nodes": [
+        "商机",
+        "商机数",
+        "去重商机数",
+        "重复商机数",
+        "去重商机金额"
+      ],
+      "edges": [
+        {
+          "from": "商机",
+          "to": "商机数",
+          "label": "measured_by",
+          "display_label": "COUNT_DISTINCT"
+        },
+        {
+          "from": "去重商机数",
+          "to": "商机数",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        },
+        {
+          "from": "去重商机数",
+          "to": "重复商机数",
+          "label": "derived_from",
+          "display_label": "衍生依赖"
+        },
+        {
+          "from": "去重商机金额",
+          "to": "重复商机数",
+          "label": "derived_from",
+          "display_label": "总额/重复数"
+        }
+      ],
+      "level": 0,
+      "guided_by_lca": null
     },
     {
       "between": [
@@ -544,6 +791,26 @@
     {
       "between": [
         "行业",
+        "商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "dimension_filter",
+      "join_key": "opportunity_id",
+      "display_label": "跨域过滤条件"
+    },
+    {
+      "between": [
+        "子行业",
+        "商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "dimension_filter",
+      "join_key": "opportunity_id",
+      "display_label": "跨域过滤条件"
+    },
+    {
+      "between": [
+        "行业",
         "总商机金额"
       ],
       "sql_clause": "WHERE",
@@ -564,6 +831,16 @@
     {
       "between": [
         "在途商机",
+        "商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "concept_filter",
+      "join_key": "",
+      "display_label": "业务口径过滤"
+    },
+    {
+      "between": [
+        "在途商机",
         "总商机金额"
       ],
       "sql_clause": "WHERE",
@@ -574,7 +851,27 @@
     {
       "between": [
         "商机创建",
+        "商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "time_filter",
+      "join_key": "",
+      "display_label": "时间过滤"
+    },
+    {
+      "between": [
+        "商机创建",
         "总商机金额"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "time_filter",
+      "join_key": "",
+      "display_label": "时间过滤"
+    },
+    {
+      "between": [
+        "预计签单",
+        "商机数"
       ],
       "sql_clause": "WHERE",
       "condition_type": "time_filter",
@@ -620,9 +917,28 @@
       "condition_type": "concept_filter",
       "join_key": "",
       "display_label": "业务口径过滤"
+    },
+    {
+      "between": [
+        "在途商机",
+        "重复商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "concept_filter",
+      "join_key": "",
+      "display_label": "业务口径过滤"
+    },
+    {
+      "between": [
+        "在途商机",
+        "去重商机数"
+      ],
+      "sql_clause": "WHERE",
+      "condition_type": "concept_filter",
+      "join_key": "",
+      "display_label": "业务口径过滤"
     }
   ],
-  "capability": "\n## 维度-指标分析能力\n  在途商机 [Concept/Filter]:\n   去重商机金额 (可作为过滤条件)\n  子行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n  行业 [Attribute]:\n   去重商机金额 (可作为分组维度、可作为过滤条件)\n\n  去重商机金额 可被以下维度/概念分析: 在途商机, 子行业, 行业",
   "hierarchy": {
     "strategy": "lca_guided_v2_no_sql_path",
     "num_levels": 2,
@@ -631,12 +947,14 @@
         "在途商机",
         "去重商机金额",
         "行业",
-        "子行业"
+        "子行业",
+        "商机"
       ],
       "1": [
         "Concept/Filter簇1",
         "Metric簇9",
-        "Attribute簇0"
+        "Attribute簇0",
+        "Entity簇3"
       ]
     },
     "lca_groups": [
@@ -653,6 +971,10 @@
       [
         "行业",
         "子行业"
+      ],
+      [
+        "商机",
+        "去重商机金额"
       ],
       [
         "在途商机",
@@ -743,15 +1065,15 @@
       }
     ],
     "path_dedup_stats": {
-      "original_count": 2,
-      "deduped_count": 4,
-      "reduction_ratio": "-100%"
+      "original_count": 4,
+      "deduped_count": 6,
+      "reduction_ratio": "-50%"
     }
   },
   "meta": {
-    "total_nodes": 10,
-    "total_edges": 28,
-    "total_paths": 4,
+    "total_nodes": 13,
+    "total_edges": 43,
+    "total_paths": 6,
     "isolated_count": 0,
     "max_hops": 5
   }
