@@ -148,32 +148,80 @@ def query(
     retriever: Optional[str] = None,
     capability: object = None,
     sql_edges: list = None,
+    verbose: bool = False,
 ) -> dict:
-    """端到端查询：问题 → 上下文 JSON。
-
-    Args:
-        question: 自然语言问题
-        index: 图谱索引
-        extractor: 实体抽取器
-        use_embedding: 是否启用 embedding 增强
-        use_llm: 是否启用 LLM 增强
-        max_hops: 最大跳数
-        retriever: 召回策略 ("v1" / "v2")，None 则读取 config
-        capability: 指标能力矩阵（MetricCapability 实例），用于生成维度-指标分析描述
-
-    Returns:
-        格式化后的上下文 dict
-    """
-    # Phase 1: 实体抽取
+    """端到端查询：问题 → 上下文 JSON。"""
     cfg = _load_config()
     ext_cfg = cfg.get("extraction", {})
-    entities = extractor.extract(
-        question, use_embedding=use_embedding, use_llm=use_llm,
-        embedding_threshold=ext_cfg.get("embedding_threshold", 0.35),
-        embedding_max_results=ext_cfg.get("embedding_max_results", 15),
-    )
 
-    # Phase 2: 子图构建（根据 config 切换）
+    # Phase 1: 实体抽取（分阶段）
+    rule_entities = extractor.extract_by_rules(question)
+
+    emb_candidates = []
+    emb_dim_results = []
+    llm_filtered = []
+
+    if use_embedding:
+        kw_results = extractor.extract_by_embedding_keywords(
+            question,
+            threshold=ext_cfg.get("embedding_threshold", 0.35),
+            max_results=ext_cfg.get("embedding_max_results", 15),
+        )
+        emb_candidates = [label for label, _ in kw_results if label not in set(rule_entities)]
+
+        try:
+            func_results = extractor.extract_function_terms(question, threshold=0.45, max_results=5)
+            for label, _ in func_results:
+                if label not in set(rule_entities) and label not in emb_candidates:
+                    emb_candidates.append(label)
+        except Exception:
+            pass
+
+        emb_dim_results = extractor.extract_by_embedding(question, top_k_attr=2, top_k_safe=3)
+
+        if use_llm and emb_candidates:
+            llm_filtered = extractor.extract_by_llm_filter(question, emb_candidates)
+            llm_filtered = extractor._filter_concept_by_question(llm_filtered, question)
+            llm_filtered = extractor._filter_derived_metrics(llm_filtered, question)
+
+    # 合成最终 entities
+    entities = list(rule_entities)
+    entity_set = set(entities)
+    if use_embedding:
+        for d in emb_dim_results:
+            node = extractor.node_map.get(d)
+            if node and node.type == "Attribute" and d not in entity_set:
+                entities.append(d)
+                entity_set.add(d)
+        if use_llm and llm_filtered:
+            for e in llm_filtered:
+                if e not in entity_set:
+                    entities.append(e)
+                    entity_set.add(e)
+        elif not use_llm:
+            for e in emb_candidates:
+                if e not in entity_set:
+                    entities.append(e)
+                    entity_set.add(e)
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"问题: {question}")
+        print(f"{'='*60}")
+        print(f"[Phase 1] 实体抽取")
+        print(f"  L1 规则匹配: {rule_entities if rule_entities else '(无命中)'}")
+        if use_embedding:
+            print(f"  L2 Embedding候选: {emb_candidates if emb_candidates else '(无命中 - 模型可能加载失败)'}")
+            print(f"  L2 Embedding维度: {emb_dim_results if emb_dim_results else '(无命中)'}")
+        else:
+            print(f"  L2 Embedding: (未启用)")
+        if use_llm:
+            print(f"  L3 LLM精筛: {llm_filtered if llm_filtered else '(无命中 - API可能调用失败)'}")
+        else:
+            print(f"  L3 LLM: (未启用)")
+        print(f"  → 最终实体: {entities}")
+
+    # Phase 2: 子图构建
     if retriever is None:
         subgraph_fn, extra_kwargs, retriever_name = _get_subgraph_builder()
     elif retriever == "v2":
@@ -194,16 +242,52 @@ def query(
 
     subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
 
-    # Phase 2.5: SQL 边后处理合并（SQL 边不参与路径搜索，仅在子图完成后补充）
+    if verbose:
+        print(f"\n[Phase 2] 子图构建 (策略={retriever_name}, max_hops={max_hops})")
+        sub_nodes = [n.label for n in subgraph.get("nodes", [])]
+        paths = subgraph.get("paths", [])
+        isolated = subgraph.get("isolated", [])
+        print(f"  节点({len(sub_nodes)}): {sub_nodes}")
+        print(f"  路径数: {len(paths)}")
+        for i, p in enumerate(paths[:5], 1):
+            chain = " → ".join(p.get("nodes", []))
+            print(f"    [{i}] {' & '.join(p.get('between',[]))}: {chain}")
+        if len(paths) > 5:
+            print(f"    ... 共 {len(paths)} 条")
+        if isolated:
+            print(f"  ⚠ 孤立节点: {isolated}")
+
+    # Phase 2.5: SQL 边后处理合并
     if sql_edges:
         subgraph = _merge_sql_edges(subgraph, sql_edges)
 
-    # Phase 3: 格式化（含指标能力矩阵）
+    if verbose:
+        sql_count = subgraph.get("sql_edge_count", 0)
+        sql_paths = subgraph.get("sql_analysis_paths", [])
+        print(f"\n[Phase 2.5] SQL边合并")
+        if sql_count:
+            print(f"  合并了 {sql_count} 条SQL边")
+        else:
+            print(f"  (无相关SQL边)")
+        if sql_paths:
+            print(f"  SQL分析路径({len(sql_paths)}):")
+            for sp in sql_paths[:5]:
+                print(f"    {sp['between'][0]} --[{sp['sql_clause']}]--> {sp['between'][1]}")
+
+    # Phase 3: 格式化
     cap_notes = ""
     if capability is not None:
         cap_notes = capability.describe_for_entities(entities, index.graph.node_map)
     context = format_context(question, entities, subgraph, meta={"max_hops": max_hops},
                             capability_notes=cap_notes)
+
+    if verbose:
+        print(f"\n[Phase 3] 最终输出")
+        print(f"  总节点: {context['meta']['total_nodes']}")
+        print(f"  总边: {context['meta']['total_edges']}")
+        print(f"  总路径: {context['meta']['total_paths']}")
+        print(f"  孤立: {context['meta']['isolated_count']}")
+        print(f"{'='*60}\n")
 
     return context
 
@@ -256,11 +340,16 @@ def main():
             retriever=args.retriever,
             capability=capability,
             sql_edges=sql_edges,
+            verbose=True,
         )
 
-        if args.md:
+        if args.output:
+            output = json.dumps(result, ensure_ascii=False, indent=2)
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(output)
+            print(f"已输出到: {args.output}", file=sys.stderr)
+        elif args.md:
             entities = result["entities"]
-            # 需要重建 subgraph dict 格式
             subgraph_raw = {
                 "nodes": [index.graph.node_map[n["label"]] for n in result["subgraph"]["nodes"] if n["label"] in index.graph.node_map],
                 "edges": _rebuild_edges(result["subgraph"]["edges"], index),
@@ -268,14 +357,6 @@ def main():
                 "isolated": result["isolated"],
             }
             print(format_context_md(args.question, entities, subgraph_raw))
-        else:
-            output = json.dumps(result, ensure_ascii=False, indent=2)
-            if args.output:
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(output)
-                print(f"已输出到: {args.output}", file=sys.stderr)
-            else:
-                print(output)
     else:
         # 交互模式
         print("\n知识图谱检索系统 v2.0", file=sys.stderr)
@@ -302,9 +383,14 @@ def main():
                 retriever=args.retriever,
                 capability=capability,
                 sql_edges=sql_edges,
+                verbose=True,
             )
 
-            if args.md:
+            if args.output:
+                output = json.dumps(result, ensure_ascii=False, indent=2)
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(output)
+            elif args.md:
                 entities = result["entities"]
                 subgraph_raw = {
                     "nodes": [index.graph.node_map[n["label"]] for n in result["subgraph"]["nodes"] if n["label"] in index.graph.node_map],
@@ -313,8 +399,6 @@ def main():
                     "isolated": result["isolated"],
                 }
                 print(format_context_md(line, entities, subgraph_raw))
-            else:
-                print(json.dumps(result, ensure_ascii=False, indent=2))
 
             print()
 
