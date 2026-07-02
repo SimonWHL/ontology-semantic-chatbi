@@ -127,14 +127,11 @@ def _merge_sql_edges(subgraph: dict, all_edges_with_sql: list) -> dict:
 def main():
     graph_path = BASE_DIR / "../data/商机.json"
     print(f"📂 加载图谱: {graph_path}")
-    graph = load_graph(graph_path, include_sql_edges=False)
 
-    # 加载含 SQL 边的图谱用于指标能力矩阵
-    from metric_capability import build_capability
-    graph_with_sql = load_graph(graph_path, include_sql_edges=True)
-    capability = build_capability(graph_with_sql)
+    from main import _load, query
+    from main import _load_config as _load_main_config
 
-    index = build_index(graph)
+    graph, index, capability, sql_edges = _load(str(graph_path))
     extractor = build_extractor(
         node_labels=set(index.graph.node_map.keys()),
         node_map=index.graph.node_map,
@@ -142,7 +139,6 @@ def main():
         graph_path=graph_path,
     )
 
-    # 启动时一次性初始化 Embedding（缓存命中→直接加载，否则编码+落盘）
     print("   ⏳ 初始化 Embedding...")
     extractor.initialize()
     print("   ✓ 就绪")
@@ -152,8 +148,8 @@ def main():
     use_embedding = ext_cfg.get("use_embedding", True)
     use_llm = ext_cfg.get("use_llm", True)
     max_hops = cfg.get("max_hops", 5)
+    retriever_name = cfg.get("retriever", "v1")
 
-    subgraph_fn, extra_kwargs, retriever_name = _get_subgraph_builder()
     print(f"   节点: {len(graph.nodes)}  语义边: {len(graph.edges)}")
     print(f"   召回策略: {retriever_name}  Embedding: {'开启' if use_embedding else '关闭'}  LLM: {'开启(精筛)' if use_llm else '关闭'}")
     print()
@@ -167,95 +163,43 @@ def main():
 
         t0 = time.time()
 
-        # Phase 1: 实体抽取
-        entities = extractor.extract(
-            q, use_embedding=use_embedding, use_llm=use_llm,
-            embedding_threshold=ext_cfg.get("embedding_threshold", 0.35),
-            embedding_max_results=ext_cfg.get("embedding_max_results", 15),
+        context = query(
+            q, index, extractor,
+            use_embedding=use_embedding,
+            use_llm=use_llm,
+            max_hops=max_hops,
+            retriever=retriever_name,
+            capability=capability,
+            sql_edges=sql_edges,
+            verbose=True,
         )
-        print(f"📌 最终实体: {entities}")
-
-        rule_entities = extractor.extract_by_rules(q)
-        kw_results = extractor.extract_by_embedding_keywords(
-            q,
-            threshold=ext_cfg.get("embedding_threshold", 0.35),
-            max_results=ext_cfg.get("embedding_max_results", 15),
-        )
-        dim_results = extractor.extract_by_embedding(q, top_k_attr=3, top_k_safe=3)
-
-        # 候选池（排除规则已匹配的）
-        rule_set = set(rule_entities)
-        emb_candidates = [l for l, _ in kw_results if l not in rule_set]
-        for d in dim_results:
-            if d not in rule_set and d not in emb_candidates:
-                emb_candidates.append(d)
-
-        attr_hits = [e for e in entities if extractor.node_map.get(e) and extractor.node_map[e].type == "Attribute"]
-        safe_hits = [e for e in entities if e not in attr_hits]
-
-        print(f"   L1 规则匹配(确定保留): {rule_entities}")
-        print(f"   L2 Embedding宽召回: {[(l, f'{s:.3f}') for l, s in kw_results]}")
-        print(f"   L3 Embedding维度: {dim_results}")
-        print(f"   → 候选池(去重后): {emb_candidates}")
-        print(f"   → 维度节点: {attr_hits}")
-        print(f"   → 固定概念: {safe_hits}")
-
-        # Phase 2: 子图构建（SQL 边不参与路径搜索）
-        subgraph = subgraph_fn(entities, index, max_hops=max_hops, **extra_kwargs)
-        # 后处理：合并 SQL 边（仅 sql_edge=True 的边）
-        subgraph_with_sql = _merge_sql_edges(subgraph, graph_with_sql.edges)
-        paths = subgraph_with_sql.get("paths", subgraph.get("paths", []))
-        isolated = subgraph_with_sql.get("isolated", subgraph.get("isolated", []))
-        sql_edge_count = subgraph_with_sql.get("sql_edge_count", 0)
-        print(f"   子图: {len(subgraph_with_sql.get('nodes', []))} 节点, {len(subgraph_with_sql.get('edges', []))} 边 (含 {sql_edge_count} SQL边), {len(paths)} 路径")
-        if isolated:
-            print(f"   ⚠ 孤立节点: {isolated}")
-
-        for i, p in enumerate(paths[:3], 1):
-            between = p.get("between", [])
-            nodes = p.get("nodes", [])
-            edges = p.get("edges", [])
-            parts = []
-            for j, nl in enumerate(nodes):
-                parts.append(nl)
-                if j < len(edges):
-                    display = edges[j].get("display_label", edges[j].get("label", "?"))
-                    parts.append(f"-[{display}]->")
-            chain = " ".join(parts)
-            between_str = " & ".join(between)
-            print(f"   [{i}] {between_str}: {chain}")
-        if len(paths) > 3:
-            print(f"   ... 共 {len(paths)} 条路径")
 
         elapsed = time.time() - t0
         print(f"   ⏱ 耗时: {elapsed:.2f}s")
 
+        entities = context["entities"]
+        attr_hits = [e for e in entities if index.graph.node_map.get(e) and index.graph.node_map[e].type == "Attribute"]
+        safe_hits = [e for e in entities if e not in attr_hits]
+
         # ── 保存 JSON + HTML ──
-        # 生成指标分析能力描述（独立模块，不参与检索）
-        cap_notes = capability.describe_for_entities(entities, graph.node_map)
-        context = format_context(q, entities, subgraph_with_sql, meta={"max_hops": max_hops},
-                                capability_notes=cap_notes)
         safe_name = _safe_filename(q)
         json_path = RESULTS_DIR / f"{qi:02d}_{safe_name}.json"
         html_path = RESULTS_DIR / f"{qi:02d}_{safe_name}.html"
 
         json_path.write_text(json.dumps(context, ensure_ascii=False, indent=2), encoding="utf-8")
-        # _generate_html 需要的是序列化好的 subgraph dict（nodes/edges 是 dict 而非对象）
         _generate_html(q, context["subgraph"], html_path)
 
         print(f"   💾 {json_path.name}  |  🌐 {html_path.name}")
 
-        # 记录汇总
         summary_rows.append({
             "id": qi,
             "question": q,
             "entities": entities,
             "attr": attr_hits,
             "safe": safe_hits,
-            "nodes": len(subgraph_with_sql.get("nodes", [])),
-            "edges": len(subgraph_with_sql.get("edges", [])),
-            "sql_edges": sql_edge_count,
-            "paths": len(paths),
+            "nodes": context["meta"]["total_nodes"],
+            "edges": context["meta"]["total_edges"],
+            "paths": context["meta"]["total_paths"],
             "elapsed_s": round(elapsed, 2),
             "json": json_path.name,
             "html": html_path.name,
@@ -267,24 +211,22 @@ def main():
     print("=" * 80)
     print("📊 测试汇总")
     print("=" * 80)
-    header = f"{'#':<3} {'问题':<32} {'维度':<16} {'固定概念':<30} {'N/E/SQL/P':<14} {'耗时':<8}"
+    header = f"{'#':<3} {'问题':<32} {'维度':<16} {'固定概念':<30} {'N/E/P':<10} {'耗时':<8}"
     print(header)
     print("-" * 80)
     for r in summary_rows:
         attr_str = ",".join(r["attr"]) if r["attr"] else "-"
         safe_str = ",".join(r["safe"]) if r["safe"] else "-"
-        nep = f"{r['nodes']}/{r['edges']}/{r.get('sql_edges',0)}/{r['paths']}"
+        nep = f"{r['nodes']}/{r['edges']}/{r['paths']}"
         elapsed_str = f"{r.get('elapsed_s', 0):.2f}s"
-        # 截断显示
         q_display = r["question"][:30] + "…" if len(r["question"]) > 30 else r["question"]
         attr_display = attr_str[:14] + "…" if len(attr_str) > 14 else attr_str
         safe_display = safe_str[:28] + "…" if len(safe_str) > 28 else safe_str
-        print(f"{r['id']:<3} {q_display:<32} {attr_display:<16} {safe_display:<30} {nep:<14} {elapsed_str:<8}")
+        print(f"{r['id']:<3} {q_display:<32} {attr_display:<16} {safe_display:<30} {nep:<10} {elapsed_str:<8}")
     print("=" * 80)
     print(f"结果已保存到: {RESULTS_DIR.resolve()}")
     print(f"  共 {len(summary_rows)} 个 JSON + {len(summary_rows)} 个 HTML")
 
-    # 保存汇总 JSON
     summary_path = RESULTS_DIR / "_summary.json"
     summary_path.write_text(
         json.dumps(summary_rows, ensure_ascii=False, indent=2), encoding="utf-8"
