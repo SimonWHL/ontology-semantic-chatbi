@@ -333,7 +333,20 @@ class EntityExtractor:
 
         不再尝试匹配城市名/行业名等动态值。
         返回去重后的节点 label 列表，按在问题中出现顺序排列。
+        括号内的匹配标记为低置信度，放入 self._low_confidence_rules。
         """
+        import re
+        # 提取括号内的文本范围
+        paren_ranges = []
+        for m in re.finditer(r'[（(][^）)]*[）)]', question):
+            paren_ranges.append((m.start(), m.end()))
+
+        def _in_parentheses(start: int, end: int) -> bool:
+            for ps, pe in paren_ranges:
+                if start >= ps and end <= pe:
+                    return True
+            return False
+
         matched: List[Tuple[int, int, str]] = []  # (start, end, label)
 
         # 遍历所有别名，找在 question 中的所有出现位置
@@ -382,10 +395,14 @@ class EntityExtractor:
         # 去重，保持顺序
         seen = set()
         result = []
-        for _, _, label in filtered:
+        self._low_confidence_rules = []
+        for start, end, label in filtered:
             if label not in seen:
                 seen.add(label)
-                result.append(label)
+                if _in_parentheses(start, end):
+                    self._low_confidence_rules.append(label)
+                else:
+                    result.append(label)
 
         return result
 
@@ -733,23 +750,11 @@ class EntityExtractor:
 
         return self._call_llm(prompt)
 
-    def extract_by_llm_filter(self, question: str, candidates: List[str]) -> List[str]:
-        """Embedding 召回 → LLM 筛选模式。
+    def extract_by_llm_filter(self, question: str, candidates: List[str], rule_entities: List[str] = None) -> List[str]:
+        """Embedding 召回 + LLM 精筛。
 
-        Embedding 先做宽召回（高阈值），把候选节点列表给 LLM 做精准筛选。
-        LLM 只从候选列表中勾选真正相关的节点，不做开放式抽取。
-
-        优势：
-        - Embedding 保召回率（多拉候选）
-        - LLM 保准确率（精准过滤噪音）
-        - 候选集远小于全量节点，LLM 判断更准确、更快
-
-        Args:
-            question: 用户问题
-            candidates: Embedding 召回的候选节点 label 列表
-
-        Returns:
-            经过 LLM 筛选后的节点 label 列表
+        LLM 从候选列表中选出问题真正需要的节点。
+        同时展示 L1 规则已确认的实体，帮助 LLM 理解完整上下文。
         """
         if not candidates:
             return []
@@ -758,63 +763,74 @@ class EntityExtractor:
         api_key = llm_cfg["api_key"]
         if not api_key or api_key == "your-deepseek-api-key-here":
             print("[WARN] 请先在 config.yaml 中配置 deepseek.api_key")
-            return candidates  # 没有 LLM 时直接返回候选
+            return candidates
 
-        # 构建候选节点列表（Metric 节点带上 cube/域标签帮助 LLM 区分）
-        attr_names = []
-        safe_names_with_domain = []
+        rule_entities = rule_entities or []
+
+        # 构建候选节点展示（Metric 带域标签）
+        candidate_display = []
         for label in candidates:
             node = self.node_map.get(label)
             if not node:
                 continue
-            if node.type == "Attribute":
-                attr_names.append(node.label)
-            elif node.type == "Metric":
-                # 给 Metric 节点标注所属域，帮助 LLM 区分商机金额 vs 出库金额
+            if node.type == "Metric":
                 cube = getattr(node, 'cube', '') or ''
                 if 'opportunity' in cube:
-                    domain = '[商机域]'
+                    candidate_display.append(f"{node.label}[商机域]")
                 elif 'deliver' in cube or 'outbound' in cube:
-                    domain = '[出库域]'
+                    candidate_display.append(f"{node.label}[出库域]")
                 else:
-                    domain = ''
-                safe_names_with_domain.append(f"{node.label}{domain}")
+                    candidate_display.append(node.label)
+            elif node.type == "Attribute":
+                candidate_display.append(f"{node.label}[维度]")
             else:
-                safe_names_with_domain.append(node.label)
+                candidate_display.append(node.label)
 
-        attr_str = "、".join(attr_names) if attr_names else "无"
-        safe_str = "、".join(safe_names_with_domain) if safe_names_with_domain else "无"
+        # L1 已确认展示
+        rule_display = []
+        for label in rule_entities:
+            node = self.node_map.get(label)
+            if not node:
+                continue
+            if node.type == "Metric":
+                cube = getattr(node, 'cube', '') or ''
+                if 'opportunity' in cube:
+                    rule_display.append(f"{node.label}[商机域]")
+                elif 'deliver' in cube or 'outbound' in cube:
+                    rule_display.append(f"{node.label}[出库域]")
+                else:
+                    rule_display.append(node.label)
+            else:
+                rule_display.append(node.label)
 
-        prompt = f"""你是知识图谱实体筛选器。从候选节点中选出问题明确需要的节点，严格筛选。
+        rule_str = "、".join(rule_display) if rule_display else "无"
+        cand_str = "、".join(candidate_display) if candidate_display else "无"
 
-维度节点(问题有地名/行业名/产品名就必须选): {attr_str}
-候选固定概念节点: {safe_str}
+        prompt = f"""你是知识图谱实体筛选器。根据用户问题，从候选节点中选出真正需要的节点。
 
-严格筛选规则:
-1. 维度节点: 候选池中的维度节点（城市/行业/产品类别/子行业）必须全部保留！问题有地名→城市必须选；有行业名→行业必须选；有产品名→产品类别必须选；说"各行业"→行业必须选。
-2. 指标(Metric)域区分【关键 - 精准匹配，不跨界】:
-   - 候选节点后缀 [商机域] 表示该指标来自商机表(cube_kpi_opportunity)，如商机金额、总商机金额、商机数等
-   - 候选节点后缀 [出库域] 表示该指标来自出库明细表(cube_gn_sales_deliver_detail)，如出库金额
-   - 「商机金额」和「出库金额」是不同域的指标，不要混淆！
-   - 问题中明确要"商机金额"/"商机总金额"/"金额"(上下文与商机相关)→只选商机域指标，不要多选出库域指标
-   - 问题中明确要"出库金额"/"交货金额"/"发货金额"→只选出库域指标，不要多选商机域指标
-   - 问题只说"金额"时，看上下文：前面有"商机"→商机域；前面有"出库"/"交货"/"发货"→出库域
-   - 注意：除非问题同时提到两个域的金额（如"对比商机金额和出库金额"），否则不要跨域选取
-   - 问题没提的指标一律不选！
-3. 指标具体映射:
-   - "商机数量"→「商机数」; "去重金额"→「去重商机金额」; "未去重金额"→「总商机金额」
-4. 状态过滤器(Concept/Filter)—核心原则【一字不差，互斥不跨界】:
-   Concept/Filter 节点代表互不相同的业务状态，每个状态只能通过问题中出现的对应关键词触发。候选池里可能出现多个状态过滤器（如赢单、中标、在途、已签、规上等），它们语义再相近也不是同一个东西！
-   选取铁律: 只有问题文字中出现该关键词或其别名时，才选对应的节点。例如: "赢单"→赢单商机; "中标"→中标商机; "在途"→在途商机; "已签"→已签商机; "规上/大项目"→规上商机; "新建"→新建商机; "未中标/丢单"→未中标商机。
-   禁止行为: 问题说了"赢单"但选中标商机、问题说了"在途"但选规上商机、问题没说任何状态但瞎选一个——这些都属于跨界误选，严格禁止！
-5. 实体(Entity): 只选「商机」（所有指标的基础实体）。除非问题明确提到其他实体。
-6. 函数/计算(Function): 问题文字中出现才选。如"占比"→选占比；"同比增长率"→选同比+增长率。
+## 已确认节点（规则匹配，仅供参考上下文）:
+{rule_str}
+
+## 待筛选候选节点:
+{cand_str}
+
+## 筛选规则:
+1. 维度[维度]: 问题提到地名→选城市；提到行业名或说"各行业"→选行业；提到产品名→选产品类别
+2. 指标域区分: [商机域]和[出库域]是不同表的指标。问题说"商机金额/金额"(商机上下文)→选商机域；说"出库金额/交货额"→选出库域。不要跨域多选
+3. 状态过滤器互斥: 赢单/中标/在途/已签/规上/新建/未中标 是不同状态，只选问题明确提到的那个
+4. 函数: 问题提到"同比/环比/占比/排名"等才选对应函数节点
+5. 实体: 只在需要基础实体时选「商机」「出库明细」「客户」
+6. 注意括号内容: 括号内通常是解释说明，不是查询意图。如"规上（出库额10万以上）"中"出库额"是在解释规上的定义，用户并不是要查出库金额
+
+## 重要提醒:
+- 问题说"商机数和金额"→需要「商机金额[商机域]」，因为上下文是商机
+- 只输出候选列表中的节点名（不带后缀标签）
+- 宁缺毋滥，不确定的不选
 
 问题: {question}
-直接输出JSON数组:"""
+直接输出JSON数组（只含节点名，不带[域]后缀）:"""
 
         result = self._call_llm(prompt)
-        # 只保留在候选集中的结果
         candidate_set = set(candidates)
         return [e for e in result if e in candidate_set]
 
@@ -934,51 +950,47 @@ class EntityExtractor:
         entities = []
         rule_set = set()
 
-        # ── Phase 1: 规则匹配（并行跑，确定性结果直接保留）──
+        # Phase 1: 规则匹配
         rule_entities = self.extract_by_rules(question)
+        low_conf_rules = getattr(self, "_low_confidence_rules", [])
         entities.extend(rule_entities)
         rule_set = set(rule_entities)
 
-        # ── Phase 2: Embedding 宽召回 + LLM 筛选 ──
+        # Phase 2: Embedding 宽召回 + LLM 筛选
         if use_embedding:
-            # 2a: Embedding 关键词宽召回（低阈值多拉候选，LLM 精筛兜底）
             kw_results = self.extract_by_embedding_keywords(
                 question, threshold=embedding_threshold, max_results=embedding_max_results
             )
-            # 提取候选 label（排除规则已匹配的）
             emb_candidates = [label for label, _ in kw_results if label not in rule_set]
 
-            # 2a2: 逐词 Embedding 召回 Function 类短词（占比/同比/环比等）
             func_results = self.extract_function_terms(question, threshold=0.45, max_results=5)
             for label, _ in func_results:
                 if label not in rule_set and label not in emb_candidates:
                     emb_candidates.append(label)
 
-            # 2b: Embedding 维度识别 → 维度节点直接保留，不交给 LLM 筛选
+            # 低置信度 L1（括号内匹配）加入候选池交给 LLM 裁决
+            for lc in low_conf_rules:
+                if lc not in rule_set and lc not in emb_candidates:
+                    emb_candidates.append(lc)
+
             dim_results = self.extract_by_embedding(question, top_k_attr=2, top_k_safe=3)
             for d in dim_results:
                 node = self.node_map.get(d)
                 if node and node.type == "Attribute":
-                    # Attribute 维度节点直接加入最终结果
                     if d not in rule_set and d not in entities:
                         entities.append(d)
                 else:
-                    # 非维度节点加入候选池给 LLM 筛选
                     if d not in rule_set and d not in emb_candidates:
                         emb_candidates.append(d)
 
             if use_llm and emb_candidates:
-                # 2c: LLM 从候选池中精准筛选
-                filtered = self.extract_by_llm_filter(question, emb_candidates)
-                # 2d: 确定性后处理 — 去掉 LLM 跨界误选的 Concept/Filter
+                filtered = self.extract_by_llm_filter(question, emb_candidates, rule_entities=rule_entities)
                 filtered = self._filter_concept_by_question(filtered, question)
-                # 2e: 派生指标去重 — 基础指标和派生指标同时命中时去派生
                 filtered = self._filter_derived_metrics(filtered, question)
                 for e in filtered:
                     if e not in rule_set:
                         entities.append(e)
             else:
-                # 不开 LLM 时直接用 Embedding 结果
                 for e in emb_candidates:
                     if e not in rule_set:
                         entities.append(e)
